@@ -87,10 +87,12 @@ coverage/
 !**/ios/**/default.perspectivev3
 !/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
 
-# API Keys
-lib/services/api_keys.dart
-android/app/src/main/res/values/api_keys.xml
-ios/Runner/GoogleService-Info.plist
+# API Keys and Secrets
+**/config.dart
+**/secrets.dart
+**/api_keys.dart
+**/keys.dart
+**/credentials.dart
 
 # Android specific
 **/android/**/gradle-wrapper.jar
