@@ -1,19 +1,22 @@
 import 'package:flutter/material.dart';
 import 'pages/login_page.dart';
+import 'pages/language_selection_page.dart';
+import 'pages/language_welcome_page.dart';
+import 'pages/traffic_condition_page.dart';
+import 'pages/reward_page.dart';
 import 'theme_provider.dart';
 
 final ThemeData lightTheme = ThemeData(
   brightness: Brightness.light,
   primaryColor: const Color(0xFF0D47A1),
   scaffoldBackgroundColor: const Color(0xFFE3F2FD),
-  colorScheme: ColorScheme.light(
-    primary: const Color(0xFF0D47A1),
-    secondary: const Color(0xFF1976D2),
-    background: const Color(0xFFE3F2FD),
-    surface: const Color(0xFFB3E5FC),
+  colorScheme: const ColorScheme.light(
+    primary: Color(0xFF0D47A1),
+    secondary: Color(0xFF1976D2),
+    background: Color(0xFFE3F2FD),
+    surface: Color(0xFFB3E5FC),
     onPrimary: Colors.white,
     onSecondary: Colors.white,
-    onBackground: Colors.black,
     onSurface: Colors.black,
   ),
   inputDecorationTheme: InputDecorationTheme(
@@ -46,14 +49,13 @@ final ThemeData darkTheme = ThemeData(
   brightness: Brightness.dark,
   primaryColor: const Color(0xFF0D47A1),
   scaffoldBackgroundColor: const Color(0xFF1A237E),
-  colorScheme: ColorScheme.dark(
-    primary: const Color(0xFF0D47A1),
-    secondary: const Color(0xFF1976D2),
-    background: const Color(0xFF1A237E),
-    surface: const Color(0xFF212B50),
+  colorScheme: const ColorScheme.dark(
+    primary: Color(0xFF0D47A1),
+    secondary: Color(0xFF1976D2),
+    background: Color(0xFF1A237E),
+    surface: Color(0xFF212B50),
     onPrimary: Colors.white,
     onSecondary: Colors.white,
-    onBackground: Colors.white,
     onSurface: Colors.white,
   ),
   inputDecorationTheme: InputDecorationTheme(
@@ -82,7 +84,9 @@ final ThemeData darkTheme = ThemeData(
   ),
 );
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
   final themeProvider = ThemeProvider();
   runApp(MyApp(themeProvider: themeProvider));
 }
@@ -103,6 +107,18 @@ class MyApp extends StatelessWidget {
           darkTheme: darkTheme,
           themeMode: mode,
           home: AnimatedLoginPage(themeProvider: themeProvider),
+          routes: {
+            '/language-selection': (context) => LanguageSelectionPage(themeProvider: themeProvider),
+            '/language-welcome': (context) => LanguageWelcomePage(language: 'English', themeProvider: themeProvider),
+            '/traffic-condition': (context) => TrafficConditionPage(themeProvider: themeProvider),
+            '/rewards': (context) => RewardPage(
+                  points: 1500,
+                  trafficAvoided: 45,
+                  alternateRoutes: 12,
+                  userName: 'John.D',
+                  themeProvider: themeProvider,
+                ),
+          },
         );
       },
     );

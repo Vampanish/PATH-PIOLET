@@ -46,11 +46,7 @@ class LanguageWelcomePage extends StatelessWidget {
               color: Theme.of(context).colorScheme.onPrimary,
             ),
             onPressed: () {
-              themeProvider.setTheme(
-                themeProvider.value == ThemeMode.dark
-                    ? ThemeMode.light
-                    : ThemeMode.dark,
-              );
+              themeProvider.toggleTheme();
             },
             tooltip: 'Toggle Theme',
           ),
@@ -118,8 +114,10 @@ class LanguageWelcomePage extends StatelessWidget {
                     shadowColor: Colors.cyanAccent.withOpacity(0.2),
                   ),
                   onPressed: () {
-                    // TODO: Navigate to main app or pop to previous
-                    Navigator.pop(context);
+                    Navigator.pushReplacementNamed(
+                      context,
+                      '/traffic-condition',
+                    );
                   },
                   child: const Text('Continue'),
                 ),

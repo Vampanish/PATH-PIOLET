@@ -35,6 +35,13 @@ class _TrafficConditionPageState extends State<TrafficConditionPage> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF0D47A1),
         title: const Text('Real-Time Traffic Conditions'),
+        leading: IconButton(
+          icon: const Icon(Icons.person, color: Colors.white),
+          onPressed: () {
+            Navigator.pushNamed(context, '/rewards');
+          },
+          tooltip: 'Profile',
+        ),
         actions: [
           IconButton(
             icon: Icon(
@@ -44,11 +51,7 @@ class _TrafficConditionPageState extends State<TrafficConditionPage> {
               color: Theme.of(context).colorScheme.onPrimary,
             ),
             onPressed: () {
-              widget.themeProvider.setTheme(
-                widget.themeProvider.value == ThemeMode.dark
-                    ? ThemeMode.light
-                    : ThemeMode.dark,
-              );
+              widget.themeProvider.toggleTheme();
             },
             tooltip: 'Toggle Theme',
           ),
@@ -164,6 +167,38 @@ class _TrafficConditionPageState extends State<TrafficConditionPage> {
                   _buildLegendDot(Colors.greenAccent, 'Clear'),
                 ],
               ),
+            ),
+          ],
+        ),
+      ),
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            const UserAccountsDrawerHeader(
+              accountName: Text('John.D'),
+              accountEmail: Text('john.d@example.com'),
+              currentAccountPicture: CircleAvatar(
+                backgroundColor: Colors.white,
+                child: Icon(Icons.person, size: 40, color: Colors.blue),
+              ),
+              decoration: BoxDecoration(
+                color: Color(0xFF0D47A1),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.emoji_events),
+              title: const Text('Rewards'),
+              onTap: () {
+                Navigator.pushNamed(context, '/rewards');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.language),
+              title: const Text('Language Selection'),
+              onTap: () {
+                Navigator.pushNamed(context, '/language-selection');
+              },
             ),
           ],
         ),

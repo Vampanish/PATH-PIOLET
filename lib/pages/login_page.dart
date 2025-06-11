@@ -1,18 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
 import '../theme_provider.dart';
-import 'language_selection_page.dart';
 
 class AnimatedLoginPage extends StatefulWidget {
   final ThemeProvider themeProvider;
+
   const AnimatedLoginPage({super.key, required this.themeProvider});
 
   @override
   State<AnimatedLoginPage> createState() => _AnimatedLoginPageState();
 }
 
-class _AnimatedLoginPageState extends State<AnimatedLoginPage>
-    with SingleTickerProviderStateMixin {
+class _AnimatedLoginPageState extends State<AnimatedLoginPage> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -47,12 +45,7 @@ class _AnimatedLoginPageState extends State<AnimatedLoginPage>
     setState(() => _isLoading = true);
     Future.delayed(const Duration(seconds: 2), () {
       setState(() => _isLoading = false);
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => LanguageSelectionPage(themeProvider: widget.themeProvider),
-        ),
-      );
+      Navigator.pushReplacementNamed(context, '/language-selection');
     });
   }
 
@@ -73,11 +66,7 @@ class _AnimatedLoginPageState extends State<AnimatedLoginPage>
               color: Theme.of(context).colorScheme.onPrimary,
             ),
             onPressed: () {
-              widget.themeProvider.setTheme(
-                widget.themeProvider.value == ThemeMode.dark
-                    ? ThemeMode.light
-                    : ThemeMode.dark,
-              );
+              widget.themeProvider.toggleTheme();
             },
             tooltip: 'Toggle Theme',
           ),
@@ -105,17 +94,6 @@ class _AnimatedLoginPageState extends State<AnimatedLoginPage>
           Positioned.fill(
             child: CustomPaint(
               painter: TrafficGridPainter(),
-            ),
-          ),
-          
-          // Animated traffic background
-          Positioned.fill(
-            child: Opacity(
-              opacity: 0.2,
-              child: Lottie.asset(
-                'assets/traffic_animation.json',
-                fit: BoxFit.cover,
-              ),
             ),
           ),
 
@@ -276,7 +254,7 @@ class _AnimatedLoginPageState extends State<AnimatedLoginPage>
                 ),
               ),
             ),
-          )
+          ),
         ],
       ),
     );
@@ -351,3 +329,4 @@ class TrafficGridPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
+

@@ -34,11 +34,7 @@ class LanguageSelectionPage extends StatelessWidget {
               color: Theme.of(context).colorScheme.onPrimary,
             ),
             onPressed: () {
-              themeProvider.setTheme(
-                themeProvider.value == ThemeMode.dark
-                    ? ThemeMode.light
-                    : ThemeMode.dark,
-              );
+              themeProvider.toggleTheme();
             },
             tooltip: 'Toggle Theme',
           ),
@@ -100,10 +96,13 @@ class LanguageSelectionPage extends StatelessWidget {
                         shadowColor: Colors.cyanAccent.withOpacity(0.2),
                       ),
                       onPressed: () {
-                        Navigator.push(
+                        Navigator.pushReplacement(
                           context,
                           MaterialPageRoute(
-                            builder: (context) => LanguageWelcomePage(language: lang['name']!, themeProvider: themeProvider),
+                            builder: (context) => LanguageWelcomePage(
+                              language: lang['name']!,
+                              themeProvider: themeProvider,
+                            ),
                           ),
                         );
                       },

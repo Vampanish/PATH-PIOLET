@@ -6,9 +6,10 @@ plugins {
 }
 
 android {
+    ndkVersion = "25.1.8937393"
     namespace = "com.example.networks"
     compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+    
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -37,6 +38,17 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
     }
+}
+
+configurations.all {
+    resolutionStrategy {
+        force("org.jetbrains.kotlin:kotlin-stdlib:1.8.0")
+        force("org.jetbrains.kotlin:kotlin-stdlib-common:1.8.0")
+    }
+}
+
+dependencies {
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:1.8.0")
 }
 
 flutter {
