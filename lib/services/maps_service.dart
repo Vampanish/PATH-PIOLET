@@ -1,7 +1,9 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:http/http.dart' as http;
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
+import 'package:flutter/material.dart';
 
 enum TransportationMode {
   driving,
@@ -12,12 +14,14 @@ enum TransportationMode {
 class MapsService {
   static const String _googleApiKey = 'API_KEYS';
   static const String _signature = 'SECRET_KEY';
-static const String _weatherApiKey = 'WEATHER_API_KEY';
+  static const String _weatherApiKey = 'WEATHER_API_KEY';
 
   // Cache for weather data to avoid too many API calls
   final Map<String, Map<String, dynamic>> _weatherCache = {};
   DateTime? _lastWeatherUpdate;
-
+  
+  // Traffic update interval in seconds
+  static const int trafficUpdateInterval = 30;
 
   Future<Map<String, dynamic>> getRoute(
     String origin, 
@@ -437,5 +441,83 @@ static const String _weatherApiKey = 'WEATHER_API_KEY';
       print('Error getting address from coordinates: $e');
       return null;
     }
+  }
+
+  // Get real-time traffic conditions for a route segment
+  String _getTrafficLevelForSegment(LatLng start, LatLng end) {
+    // Simulate traffic based on time of day and random factors
+    final now = DateTime.now();
+    final hour = now.hour;
+    
+    // Base traffic level on time of day
+    String baseLevel;
+    if (hour >= 7 && hour <= 9) {
+      // Morning rush hour
+      baseLevel = 'heavy';
+    } else if (hour >= 16 && hour <= 18) {
+      // Evening rush hour
+      baseLevel = 'heavy';
+    } else if (hour >= 10 && hour <= 15) {
+      // Mid-day
+      baseLevel = 'moderate';
+    } else {
+      // Night/early morning
+      baseLevel = 'light';
+    }
+    
+    // Add some randomness to make it more dynamic
+    final random = Random();
+    final randomFactor = random.nextDouble();
+    
+    if (randomFactor < 0.3) {
+      // 30% chance to change traffic level
+      if (baseLevel == 'heavy') {
+        return randomFactor < 0.5 ? 'moderate' : 'heavy';
+      } else if (baseLevel == 'moderate') {
+        return randomFactor < 0.5 ? 'light' : 'heavy';
+      } else {
+        return randomFactor < 0.5 ? 'moderate' : 'light';
+      }
+    }
+    
+    return baseLevel;
+  }
+
+  Color getTrafficColor(String trafficLevel) {
+    switch (trafficLevel.toLowerCase()) {
+      case 'heavy':
+        return Colors.red;
+      case 'moderate':
+        return Colors.orange;
+      case 'light':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  Future<Map<String, dynamic>> getTrafficConditionsForRoute(
+    List<LatLng> routePoints,
+    LatLng currentLocation,
+  ) async {
+    print('Getting traffic conditions for route...'); // Debug print
+    Map<String, String> routeTraffic = {};
+    
+    // Split route into segments and get traffic for each
+    for (int i = 0; i < routePoints.length - 1; i++) {
+      final start = routePoints[i];
+      final end = routePoints[i + 1];
+      final segmentKey = '${start.latitude},${start.longitude}-${end.latitude},${end.longitude}';
+      
+      // Get traffic level for this segment
+      final trafficLevel = _getTrafficLevelForSegment(start, end);
+      routeTraffic[segmentKey] = trafficLevel;
+      
+      print('Segment $i: Traffic level = $trafficLevel'); // Debug print
+    }
+    
+    return {
+      'route_traffic': routeTraffic,
+    };
   }
 } 

@@ -11,6 +11,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
 
 // Global variable to persist route data across hot reloads
 class RouteState {
@@ -92,6 +93,9 @@ class _MapsHomePageState extends State<MapsHomePage> {
   bool _showClickedLocationWeather = false;
   String? _routeTrafficImpact;
   bool _showRouteSummaryCard = false;
+  Timer? _trafficUpdateTimer;
+  Map<String, String> _routeTrafficLevels = {};
+  LatLng? _currentLocation;
 
   @override
   void initState() {
@@ -110,6 +114,7 @@ class _MapsHomePageState extends State<MapsHomePage> {
       _selectedRouteIndex = RouteState.selectedRouteIndex;
       _routeColor = RouteState.routeColor;
     }
+    _initializeLocation();
   }
 
   Future<void> _initLocationAndMap() async {
@@ -148,6 +153,7 @@ class _MapsHomePageState extends State<MapsHomePage> {
     _sourceController.dispose();
     _destinationController.dispose();
     _removeOverlay();
+    _trafficUpdateTimer?.cancel();
     super.dispose();
   }
 
@@ -308,6 +314,7 @@ class _MapsHomePageState extends State<MapsHomePage> {
       _destinationWeather = null;
       _routeTrafficImpact = null;
       _showRouteSummaryCard = false;
+      _stopTrafficUpdates();
     });
     
     try {
@@ -328,20 +335,32 @@ class _MapsHomePageState extends State<MapsHomePage> {
           }
           _showRouteSummaryCard = true;
         });
-      } else if (data != null && data['status'] == 'ZERO_RESULTS') {
-        String message = 'No routes available';
-        if (_selectedTransportMode == TransportationMode.walking) {
-          message = 'Walking route not available';
-        } else if (_selectedTransportMode == TransportationMode.bicycling) {
-          message = 'Biking route not available';
+        
+        // Start traffic updates for the new route
+        print('Starting traffic updates after route selection...'); // Debug print
+        _startTrafficUpdates();
+      } else if (data['status'] == 'ZERO_RESULTS') {
+        print("No route found for the given locations.");
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('No route found for ${_selectedTransportMode.toString().split('.').last} mode'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 3),
+            ),
+          );
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(message),
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
-          ),
-        );
+      } else {
+        print("Google Directions API Error: ${data['error_message'] ?? 'Unknown error'}");
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error finding route: ${data['error_message'] ?? 'Unknown error'}'),
+              backgroundColor: Colors.red,
+              duration: Duration(seconds: 3),
+            ),
+          );
+        }
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -351,6 +370,15 @@ class _MapsHomePageState extends State<MapsHomePage> {
           duration: Duration(seconds: 3),
         ),
       );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error finding route: $e'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
+      }
     }
   }
 
@@ -364,6 +392,8 @@ class _MapsHomePageState extends State<MapsHomePage> {
     _alternativeRoutes.clear();
     _selectedRouteIndex = 0;
     _routeColor = null;
+    _routeTrafficLevels.clear();
+    _stopTrafficUpdates();
     
     // Clear global state
     RouteState.sourceLocation = null;
@@ -1390,7 +1420,13 @@ class _MapsHomePageState extends State<MapsHomePage> {
             );
           }
         },
-        child: Icon(Icons.wb_sunny),
+        child: _clickedLocationWeather != null && _clickedLocationWeather!['weather']['icon'] != null
+            ? Image.network(
+                'https://openweathermap.org/img/wn/${_clickedLocationWeather!['weather']['icon']}@2x.png',
+                width: 32,
+                height: 32,
+              )
+            : Icon(Icons.wb_sunny),
         backgroundColor: Colors.cyanAccent[400]!.withOpacity(0.8),
       ),
     );
@@ -1401,7 +1437,7 @@ class _MapsHomePageState extends State<MapsHomePage> {
     
     return Positioned(
       bottom: _showRouteSummaryCard ? 200 : 16,
-      right: 16,
+      left: 16,
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.3),
@@ -1435,5 +1471,107 @@ class _MapsHomePageState extends State<MapsHomePage> {
         ),
       ),
     );
+  }
+
+  Future<void> _initializeLocation() async {
+    final location = await _locationService.getCurrentLocation();
+    if (location != null) {
+      setState(() {
+        _currentLocation = location;
+      });
+    }
+  }
+
+  void _startTrafficUpdates() {
+    print('Starting traffic updates...'); // Debug print
+    _trafficUpdateTimer?.cancel();
+    // Update immediately
+    _updateTrafficConditions();
+    // Then update every 10 seconds (reduced from 30 for testing)
+    _trafficUpdateTimer = Timer.periodic(
+      Duration(seconds: 10),
+      (timer) => _updateTrafficConditions(),
+    );
+  }
+
+  void _stopTrafficUpdates() {
+    _trafficUpdateTimer?.cancel();
+    _trafficUpdateTimer = null;
+  }
+
+  Future<void> _updateTrafficConditions() async {
+    if (_currentLocation == null || _polylines.isEmpty) {
+      print('Cannot update traffic: Location or polylines not available');
+      return;
+    }
+
+    print('Updating traffic conditions...'); // Debug print
+
+    try {
+      // Get all route points from polylines
+      List<LatLng> allRoutePoints = [];
+      for (var polyline in _polylines) {
+        allRoutePoints.addAll(polyline.points);
+      }
+
+      print('Route points count: ${allRoutePoints.length}'); // Debug print
+
+      // Get traffic conditions
+      final trafficData = await _mapsService.getTrafficConditionsForRoute(
+        allRoutePoints,
+        _currentLocation!,
+      );
+
+      print('Received traffic data: $trafficData'); // Debug print
+
+      setState(() {
+        _routeTrafficLevels = Map<String, String>.from(trafficData['route_traffic']);
+        print('Updated traffic levels: $_routeTrafficLevels'); // Debug print
+        _updateRouteColors();
+      });
+    } catch (e) {
+      print('Error updating traffic conditions: $e');
+    }
+  }
+
+  void _updateRouteColors() {
+    print('Updating route colors...'); // Debug print
+    Set<Polyline> updatedPolylines = {};
+    
+    for (var polyline in _polylines) {
+      final points = polyline.points;
+      List<Color> segmentColors = [];
+      
+      // Determine color for each segment
+      for (int i = 0; i < points.length - 1; i++) {
+        final start = points[i];
+        final end = points[i + 1];
+        final segmentKey = '${start.latitude},${start.longitude}-${end.latitude},${end.longitude}';
+        
+        final trafficLevel = _routeTrafficLevels[segmentKey] ?? 'unknown';
+        final color = _mapsService.getTrafficColor(trafficLevel);
+        segmentColors.add(color);
+        
+        print('Segment $i: Traffic level = $trafficLevel, Color = $color'); // Debug print
+      }
+
+      // Create new polyline with updated colors
+      updatedPolylines.add(
+        Polyline(
+          polylineId: polyline.polylineId,
+          points: points,
+          color: segmentColors.first, // Use first segment color as base
+          width: 5, // Increased width for better visibility
+          patterns: [PatternItem.dash(20), PatternItem.gap(10)], // Adjusted pattern for better visibility
+          onTap: polyline.onTap,
+          consumeTapEvents: polyline.consumeTapEvents,
+        ),
+      );
+    }
+
+    print('Updating polylines with new colors...'); // Debug print
+    setState(() {
+      _polylines = updatedPolylines;
+    });
   }
 }
