@@ -818,14 +818,30 @@ class _MapsHomePageState extends State<MapsHomePage> {
                 ),
                 child: IconButton(
                   onPressed: () async {
-                    final location = await _locationService.getCurrentLocation();
-                    if (location != null) {
-                      final address = await _mapsService.getAddressFromLatLng(location);
-                      if (address != null) {
-                        setState(() {
-                          _sourceController.text = address;
-                        });
+                    try {
+                      final location = await _locationService.getCurrentLocation();
+                      if (location != null) {
+                        final address = await _mapsService.getAddressFromLatLng(location);
+                        if (address != null) {
+                          setState(() {
+                            _sourceController.text = address;
+                            _currentLocation = location;
+                          });
+                          // Update map camera to current location
+                          if (mapController != null) {
+                            mapController!.animateCamera(
+                              CameraUpdate.newLatLngZoom(location, 15),
+                            );
+                          }
+                        }
                       }
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error getting current location: $e'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
                     }
                   },
                   icon: Icon(Icons.my_location, color: Colors.cyanAccent[700]),
