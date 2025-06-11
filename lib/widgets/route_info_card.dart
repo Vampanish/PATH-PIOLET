@@ -5,6 +5,8 @@ class RouteInfoCard extends StatelessWidget {
   final String distance;
   final Color? routeColor;
   final int alternativeRoutesCount;
+  final Map<String, dynamic>? destinationWeather;
+  final String? trafficImpact;
 
   const RouteInfoCard({
     Key? key,
@@ -12,23 +14,26 @@ class RouteInfoCard extends StatelessWidget {
     required this.distance,
     this.routeColor,
     this.alternativeRoutesCount = 0,
+    this.destinationWeather,
+    this.trafficImpact,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         if (alternativeRoutesCount > 1)
           Container(
             margin: EdgeInsets.only(bottom: 8),
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black26,
-                  blurRadius: 6,
+                  blurRadius: 4,
                   offset: Offset(0, 2),
                 ),
               ],
@@ -39,14 +44,14 @@ class RouteInfoCard extends StatelessWidget {
                 Text(
                   '$alternativeRoutesCount routes available',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 12,
                     color: Colors.grey[600],
                   ),
                 ),
                 Text(
                   'Tap route to select',
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 12,
                     color: Colors.grey[600],
                   ),
                 ),
@@ -54,68 +59,114 @@ class RouteInfoCard extends StatelessWidget {
             ),
           ),
         Container(
-          padding: EdgeInsets.all(16),
+          padding: EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(10),
             boxShadow: [
               BoxShadow(
                 color: Colors.black26,
-                blurRadius: 6,
+                blurRadius: 4,
                 offset: Offset(0, 2),
               ),
             ],
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Column(
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Icon(Icons.access_time, color: routeColor ?? Colors.cyanAccent[700]),
-                  SizedBox(height: 4),
                   Text(
-                    duration,
+                    'Route Summary',
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: 15,
                       fontWeight: FontWeight.bold,
-                      color: routeColor ?? Colors.cyanAccent[700],
                     ),
                   ),
-                  Text(
-                    'Duration',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
+                  if (routeColor != null)
+                    Container(
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        color: routeColor,
+                        shape: BoxShape.circle,
+                      ),
                     ),
-                  ),
                 ],
               ),
-              Container(
-                height: 40,
-                width: 1,
-                color: Colors.grey[300],
+              SizedBox(height: 6),
+              Text(
+                'Duration: $duration',
+                style: TextStyle(fontSize: 13),
               ),
-              Column(
-                children: [
-                  Icon(Icons.route, color: routeColor ?? Colors.cyanAccent[700]),
-                  SizedBox(height: 4),
-                  Text(
-                    distance,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: routeColor ?? Colors.cyanAccent[700],
-                    ),
-                  ),
-                  Text(
-                    'Distance',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
+              Text(
+                'Distance: $distance',
+                style: TextStyle(fontSize: 13),
               ),
+              if (trafficImpact != null) ...[
+                SizedBox(height: 6),
+                Text(
+                  'Traffic: $trafficImpact',
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: trafficImpact!.contains('Heavy') ? Colors.red : 
+                           (trafficImpact!.contains('Moderate') ? Colors.orange : Colors.green)
+                  ),
+                ),
+              ],
+              if (destinationWeather != null) ...[
+                SizedBox(height: 12),
+                Divider(height: 1, thickness: 0.5),
+                SizedBox(height: 8),
+                Text(
+                  'Destination Weather',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 6),
+                Row(
+                  children: [
+                    if (destinationWeather!['icon'] != null)
+                      Image.network(
+                        'https://openweathermap.org/img/wn/${destinationWeather!['icon']}@2x.png',
+                        width: 40,
+                        height: 40,
+                      ),
+                    SizedBox(width: 6),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '${destinationWeather!['city']}',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            '${destinationWeather!['condition']}',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                SizedBox(height: 6),
+                Text(
+                  'Temp: ${destinationWeather!['temperature'].toStringAsFixed(1)}°C',
+                  style: TextStyle(fontSize: 12),
+                ),
+                Text(
+                  'Humidity: ${destinationWeather!['humidity']}%',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ],
             ],
           ),
         ),

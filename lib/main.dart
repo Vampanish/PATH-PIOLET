@@ -84,15 +84,21 @@ class _MapsHomePageState extends State<MapsHomePage> {
   TransportationMode _selectedTransportMode = TransportationMode.driving;
   Map<String, dynamic>? _trafficInfo;
   Map<String, dynamic>? _weatherInfo;
-  bool _showTrafficInfo = false;
-  bool _showWeatherInfo = false;
+  Map<String, dynamic>? _destinationWeather;
+  LatLng? _lastClickedLocation;
+  Map<String, dynamic>? _clickedLocationWeather;
+  bool _showCurrentLocationTrafficInfo = false;
+  bool _showCurrentLocationWeatherInfo = false;
+  bool _showClickedLocationWeather = false;
+  String? _routeTrafficImpact;
+  bool _showRouteSummaryCard = false;
 
   @override
   void initState() {
     super.initState();
-    _initializeApp();
-    _sourceFocusNode.addListener(_handleSourceFocus);
-    _destinationFocusNode.addListener(_handleDestinationFocus);
+    _sourceFocusNode.addListener(_onSourceFocusChanged);
+    _destinationFocusNode.addListener(_onDestinationFocusChanged);
+    _initLocationAndMap();
     if (RouteState.sourceLocation != null) {
       _sourceController.text = RouteState.sourceAddress ?? '';
       _destinationController.text = RouteState.destinationAddress ?? '';
@@ -106,16 +112,11 @@ class _MapsHomePageState extends State<MapsHomePage> {
     }
   }
 
-  Future<void> _initializeApp() async {
-    print("Initializing app...");
-    await _loadCustomMarker();
+  Future<void> _initLocationAndMap() async {
     await _locationService.getCurrentLocation();
-    if (mounted) {
-      setState(() {
-        _isMapReady = true;
-        print("App initialized and map ready.");
-      });
-    }
+    setState(() {
+      _isMapReady = true;
+    });
   }
 
   Future<void> _loadCustomMarker() async {
@@ -140,8 +141,8 @@ class _MapsHomePageState extends State<MapsHomePage> {
 
   @override
   void dispose() {
-    _sourceFocusNode.removeListener(_handleSourceFocus);
-    _destinationFocusNode.removeListener(_handleDestinationFocus);
+    _sourceFocusNode.removeListener(_onSourceFocusChanged);
+    _destinationFocusNode.removeListener(_onDestinationFocusChanged);
     _sourceFocusNode.dispose();
     _destinationFocusNode.dispose();
     _sourceController.dispose();
@@ -150,7 +151,7 @@ class _MapsHomePageState extends State<MapsHomePage> {
     super.dispose();
   }
 
-  void _handleSourceFocus() {
+  void _onSourceFocusChanged() {
     _isSourceFocused = _sourceFocusNode.hasFocus;
     if (_isSourceFocused) {
       _getPlaceSuggestions(_sourceController.text, true);
@@ -159,7 +160,7 @@ class _MapsHomePageState extends State<MapsHomePage> {
     }
   }
 
-  void _handleDestinationFocus() {
+  void _onDestinationFocusChanged() {
     _isDestinationFocused = _destinationFocusNode.hasFocus;
     if (_isDestinationFocused) {
       _getPlaceSuggestions(_destinationController.text, false);
@@ -186,8 +187,8 @@ class _MapsHomePageState extends State<MapsHomePage> {
       return;
     }
 
-    final String apiKey = 'API_KEY';
-    final String signature = 'SIGNATURE';
+    final String apiKey = 'API_KEYS';
+    final String signature = 'SECRET_KEY';
     final String url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json'
         '?input=${Uri.encodeComponent(input)}'
         '&key=$apiKey'
@@ -308,10 +309,13 @@ class _MapsHomePageState extends State<MapsHomePage> {
       _clearMap();
       _trafficInfo = null;
       _weatherInfo = null;
+      _destinationWeather = null;
+      _routeTrafficImpact = null;
+      _showRouteSummaryCard = false;
     });
     
     try {
-      final data = await _mapsService.getRoute(
+      final data = await _mapsService.getRouteWithWeather(
         _sourceController.text,
         _destinationController.text,
         _selectedTransportMode,
@@ -321,6 +325,13 @@ class _MapsHomePageState extends State<MapsHomePage> {
         print("Route data received. Processing ${data['routes'].length} routes.");
         setState(() {
           _processRoutes(data['routes']);
+          if (data['destination_weather'] != null) {
+            _destinationWeather = data['destination_weather'];
+          }
+          if (data['traffic_impact'] != null) {
+            _routeTrafficImpact = data['traffic_impact'];
+          }
+          _showRouteSummaryCard = true;
         });
       } else if (data['status'] == 'ZERO_RESULTS') {
         print("No route found for the given locations.");
@@ -542,16 +553,22 @@ class _MapsHomePageState extends State<MapsHomePage> {
   }
 
   Future<void> _updateTrafficAndWeatherInfo(LatLng location) async {
+    print('Attempting to update traffic and weather info for: $location'); // Debug: Function call
     try {
       final trafficData = await _mapsService.getTrafficConditions(location);
       final weatherData = await _mapsService.getWeatherInfo(location);
       
+      print('Received traffic data: $trafficData'); // Debug: API response
+      print('Received weather data: $weatherData'); // Debug: API response
+      
       setState(() {
         _trafficInfo = trafficData;
         _weatherInfo = weatherData;
+        print('_trafficInfo updated to: $_trafficInfo'); // Debug: State update
+        print('_weatherInfo updated to: $_weatherInfo'); // Debug: State update
       });
     } catch (e) {
-      print('Error updating traffic and weather info: $e');
+      print('Error updating traffic and weather info: $e'); // Debug: Error catching
     }
   }
 
@@ -655,7 +672,7 @@ class _MapsHomePageState extends State<MapsHomePage> {
                 _isMapReady
                     ? _buildMap()
                     : const Center(child: CircularProgressIndicator()),
-                if (_routeDuration != null && _routeDistance != null)
+                if (_showRouteSummaryCard && _routeDuration != null && _routeDistance != null)
                   Positioned(
                     bottom: 16,
                     left: 16,
@@ -684,6 +701,8 @@ class _MapsHomePageState extends State<MapsHomePage> {
                 _buildAppTitle(),
                 _buildInfoButtons(),
                 _buildTrafficAndWeatherInfo(),
+                _buildWeatherButton(),
+                _buildRouteSummaryToggleButton(),
               ],
             ),
           ),
@@ -710,8 +729,16 @@ class _MapsHomePageState extends State<MapsHomePage> {
   }
 
   Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
+    return Container(
+      padding: EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Colors.cyanAccent[400]!.withOpacity(0.5),
+          width: 1,
+        ),
+      ),
       child: Column(
         children: [
           CompositedTransformTarget(
@@ -721,6 +748,7 @@ class _MapsHomePageState extends State<MapsHomePage> {
               focusNode: _sourceFocusNode,
               decoration: _buildTextFieldDecoration('Enter Source'),
               onChanged: (value) => _getPlaceSuggestions(value, true),
+              style: TextStyle(fontSize: 14.0, color: Colors.black87),
             ),
           ),
           SizedBox(height: 10),
@@ -731,18 +759,26 @@ class _MapsHomePageState extends State<MapsHomePage> {
               focusNode: _destinationFocusNode,
               decoration: _buildTextFieldDecoration('Enter Destination'),
               onChanged: (value) => _getPlaceSuggestions(value, false),
+              style: TextStyle(fontSize: 14.0, color: Colors.black87),
             ),
           ),
           SizedBox(height: 10),
           ElevatedButton(
             onPressed: _isMapReady ? _getRoute : null,
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.cyanAccent[400],
-              foregroundColor: Colors.white,
-              padding: EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+              backgroundColor: Colors.cyanAccent[400]!.withOpacity(0.3),
+              foregroundColor: Colors.cyanAccent[700],
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              textStyle: TextStyle(fontSize: 16.0),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(8.0),
+                side: BorderSide(
+                  color: Colors.cyanAccent[400]!.withOpacity(0.5),
+                  width: 1.0,
+                ),
               ),
+              minimumSize: Size(double.infinity, 40),
+              elevation: 0,
             ),
             child: const Text('Show Route'),
           ),
@@ -777,19 +813,23 @@ class _MapsHomePageState extends State<MapsHomePage> {
   InputDecoration _buildTextFieldDecoration(String hintText) {
     return InputDecoration(
       hintText: hintText,
-      prefixIcon: Icon(Icons.location_on, color: Colors.cyanAccent[400]),
+      hintStyle: TextStyle(fontSize: 14.0),
+      prefixIcon: Icon(Icons.location_on, color: Colors.cyanAccent[400], size: 20.0),
+      fillColor: Colors.white.withOpacity(0.9),
+      filled: true,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8.0),
-        borderSide: BorderSide(color: Colors.cyanAccent[400]!, width: 2.0),
+        borderSide: BorderSide(color: Colors.cyanAccent[400]!.withOpacity(0.5), width: 1.0),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8.0),
-        borderSide: BorderSide(color: Colors.cyanAccent[700]!, width: 2.0),
+        borderSide: BorderSide(color: Colors.cyanAccent[700]!.withOpacity(0.8), width: 2.0),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8.0),
-        borderSide: BorderSide(color: Colors.cyanAccent[400]!, width: 1.0),
+        borderSide: BorderSide(color: Colors.cyanAccent[400]!.withOpacity(0.5), width: 1.0),
       ),
+      contentPadding: EdgeInsets.symmetric(vertical: 12.0, horizontal: 10.0),
     );
   }
 
@@ -798,12 +838,10 @@ class _MapsHomePageState extends State<MapsHomePage> {
       onMapCreated: (GoogleMapController controller) {
         mapController = controller;
         if (RouteState.sourceLocation != null) {
-          // If we have a stored source location, move to it
           controller.animateCamera(
             CameraUpdate.newLatLngZoom(RouteState.sourceLocation!, 15),
           );
         } else if (_locationService.currentLocation != null) {
-          // Otherwise use current location
           controller.animateCamera(
             CameraUpdate.newLatLng(_locationService.currentLocation!),
           );
@@ -819,8 +857,25 @@ class _MapsHomePageState extends State<MapsHomePage> {
       zoomControlsEnabled: true,
       compassEnabled: true,
       polylines: _polylines,
-      markers: _markers.union(_nearbyPlacesMarkers),
-      onTap: (_) {},
+      markers: _markers.union(_nearbyPlacesMarkers).union(
+        _lastClickedLocation != null && !_showRouteSummaryCard ? {
+          Marker(
+            markerId: const MarkerId('clicked_location'),
+            position: _lastClickedLocation!,
+            icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
+            infoWindow: InfoWindow(title: 'Clicked Location'),
+          )
+        } : {}
+      ),
+      onTap: (LatLng location) async {
+        setState(() {
+          _lastClickedLocation = location;
+          _showClickedLocationWeather = false;
+          _clickedLocationWeather = null;
+          _showRouteSummaryCard = false;
+          _markers.removeWhere((marker) => marker.markerId.value == 'clicked_location');
+        });
+      },
     );
   }
 
@@ -862,28 +917,52 @@ class _MapsHomePageState extends State<MapsHomePage> {
           _buildInfoButton(
             'Traffic',
             Icons.traffic,
-            _showTrafficInfo,
-            () {
+            _showCurrentLocationTrafficInfo,
+            () async {
               setState(() {
-                _showTrafficInfo = !_showTrafficInfo;
-                if (_showTrafficInfo && _locationService.currentLocation != null) {
-                  _updateTrafficAndWeatherInfo(_locationService.currentLocation!);
-                }
+                _showCurrentLocationTrafficInfo = !_showCurrentLocationTrafficInfo;
+                _showCurrentLocationWeatherInfo = false;
+                _showClickedLocationWeather = false;
               });
+              if (_showCurrentLocationTrafficInfo) {
+                print('Traffic button toggled ON.'); // Debug: Button toggle
+                final currentLocation = await _locationService.getCurrentLocation(); // Ensure current location is fetched
+                if (currentLocation != null) {
+                  print('Current location available: $currentLocation'); // Debug: Location status
+                  await _updateTrafficAndWeatherInfo(currentLocation);
+                } else {
+                  print('Current location NOT available for traffic info.'); // Debug: Location status
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Current location not available for traffic info.')),
+                  );
+                }
+              }
             },
           ),
           SizedBox(width: 8),
           _buildInfoButton(
             'Weather',
             Icons.wb_sunny,
-            _showWeatherInfo,
-            () {
+            _showCurrentLocationWeatherInfo,
+            () async {
               setState(() {
-                _showWeatherInfo = !_showWeatherInfo;
-                if (_showWeatherInfo && _locationService.currentLocation != null) {
-                  _updateTrafficAndWeatherInfo(_locationService.currentLocation!);
-                }
+                _showCurrentLocationWeatherInfo = !_showCurrentLocationWeatherInfo;
+                _showCurrentLocationTrafficInfo = false;
+                _showClickedLocationWeather = false;
               });
+              if (_showCurrentLocationWeatherInfo) {
+                print('Weather button toggled ON.'); // Debug: Button toggle
+                final currentLocation = await _locationService.getCurrentLocation(); // Ensure current location is fetched
+                if (currentLocation != null) {
+                  print('Current location available: $currentLocation'); // Debug: Location status
+                  await _updateTrafficAndWeatherInfo(currentLocation);
+                } else {
+                  print('Current location NOT available for weather info.'); // Debug: Location status
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Current location not available for weather info.')),
+                  );
+                }
+              }
             },
           ),
         ],
@@ -891,46 +970,62 @@ class _MapsHomePageState extends State<MapsHomePage> {
     );
   }
 
-  Widget _buildInfoButton(String label, IconData icon, bool isSelected, VoidCallback onTap) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected ? Colors.cyanAccent[100] : Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black26,
-              blurRadius: 4,
-              offset: Offset(0, 2),
-            ),
-          ],
+  Widget _buildInfoButton(String label, IconData icon, bool isActive, VoidCallback onPressed) {
+    return Container(
+      decoration: BoxDecoration(
+        color: isActive ? Colors.cyanAccent[400]!.withOpacity(0.3) : Colors.white.withOpacity(0.3),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: isActive ? Colors.cyanAccent[400]!.withOpacity(0.5) : Colors.grey.withOpacity(0.3),
+          width: 1,
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? Colors.cyanAccent[700] : Colors.grey[600],
-              size: 20,
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(8),
+          child: Padding(
+            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
+                  color: isActive ? Colors.cyanAccent[700] : Colors.black87,
+                  size: 20,
+                ),
+                SizedBox(width: 4),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: isActive ? Colors.cyanAccent[700] : Colors.black87,
+                    fontSize: 14,
+                  ),
+                ),
+              ],
             ),
-            SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? Colors.cyanAccent[700] : Colors.grey[600],
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildTrafficAndWeatherInfo() {
-    if (!_showTrafficInfo && !_showWeatherInfo) return SizedBox.shrink();
+    if (_showCurrentLocationTrafficInfo && _trafficInfo != null) {
+      return _buildCurrentLocationTrafficInfo();
+    } else if (_showCurrentLocationWeatherInfo && _weatherInfo != null) {
+      return _buildCurrentLocationWeatherInfo();
+    } else if (_showClickedLocationWeather && _clickedLocationWeather != null) {
+      return _buildClickedLocationWeatherInfo();
+    }
+    return SizedBox.shrink();
+  }
+
+  Widget _buildCurrentLocationTrafficInfo() {
+    print('Building Current Location Traffic Info widget.'); // Debug: Widget build
+    print('Traffic Info state: $_trafficInfo'); // Debug: Widget state data
+    if (_trafficInfo == null) return SizedBox.shrink();
 
     return Positioned(
       top: 130,
@@ -947,59 +1042,32 @@ class _MapsHomePageState extends State<MapsHomePage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (_showTrafficInfo && _trafficInfo != null) ...[
-                Row(
-                  children: [
-                    Icon(Icons.traffic, color: Colors.orange),
-                    SizedBox(width: 8),
-                    Text(
-                      'Traffic Conditions',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
+              Row(
+                children: [
+                  Icon(Icons.traffic, color: _getTrafficColor(_trafficInfo!['traffic_level'])),
+                  SizedBox(width: 8),
+                  Text(
+                    'Traffic Conditions (Current Location)',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
                     ),
-                  ],
+                  ),
+                ],
+              ),
+              SizedBox(height: 8),
+              if (_trafficInfo!['address'] != null) Text(
+                'Location: ${_trafficInfo!['address']}',
+                style: TextStyle(fontSize: 14),
+              ),
+              Text(
+                'Traffic Level: ${_trafficInfo!['traffic_level']}',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: _getTrafficColor(_trafficInfo!['traffic_level']),
+                  fontWeight: FontWeight.bold,
                 ),
-                SizedBox(height: 8),
-                Text(
-                  'Location: ${_trafficInfo!['address']}',
-                  style: TextStyle(fontSize: 14),
-                ),
-                Text(
-                  'Traffic Level: ${_trafficInfo!['traffic_level']}',
-                  style: TextStyle(fontSize: 14),
-                ),
-                SizedBox(height: 16),
-              ],
-              if (_showWeatherInfo && _weatherInfo != null) ...[
-                Row(
-                  children: [
-                    Icon(Icons.wb_sunny, color: Colors.amber),
-                    SizedBox(width: 8),
-                    Text(
-                      'Weather Information',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
-                ),
-                SizedBox(height: 8),
-                Text(
-                  'Location: ${_weatherInfo!['address']}',
-                  style: TextStyle(fontSize: 14),
-                ),
-                Text(
-                  'Temperature: ${_weatherInfo!['temperature'].toStringAsFixed(1)}°C',
-                  style: TextStyle(fontSize: 14),
-                ),
-                Text(
-                  'Condition: ${_weatherInfo!['condition']}',
-                  style: TextStyle(fontSize: 14),
-                ),
-              ],
+              ),
             ],
           ),
         ),
@@ -1007,42 +1075,291 @@ class _MapsHomePageState extends State<MapsHomePage> {
     );
   }
 
+  Widget _buildCurrentLocationWeatherInfo() {
+    print('Building Current Location Weather Info widget.'); // Debug: Widget build
+    print('Weather Info state: $_weatherInfo'); // Debug: Widget state data
+    if (_weatherInfo == null) return SizedBox.shrink();
+
+    return Positioned(
+      top: 130,
+      left: 16,
+      right: 16,
+      child: Card(
+        elevation: 4,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.wb_sunny, color: Colors.amber),
+                  SizedBox(width: 8),
+                  Text(
+                    'Weather Information (Current Location)',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 8),
+              Row(
+                children: [
+                  if (_weatherInfo!['icon'] != null)
+                    Image.network(
+                      'https://openweathermap.org/img/wn/${_weatherInfo!['icon']}@2x.png',
+                      width: 50,
+                      height: 50,
+                    ),
+                  SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (_weatherInfo!['city'] != null) Text(
+                        '${_weatherInfo!['city']}',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      if (_weatherInfo!['condition'] != null) Text(
+                        '${_weatherInfo!['condition']}',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              SizedBox(height: 8),
+              if (_weatherInfo!['temperature'] != null) Text(
+                'Temperature: ${_weatherInfo!['temperature'].toStringAsFixed(1)}°C',
+                style: TextStyle(fontSize: 14),
+              ),
+              if (_weatherInfo!['feels_like'] != null) Text(
+                'Feels like: ${_weatherInfo!['feels_like'].toStringAsFixed(1)}°C',
+                style: TextStyle(fontSize: 14),
+              ),
+              if (_weatherInfo!['humidity'] != null) Text(
+                'Humidity: ${_weatherInfo!['humidity']}%',
+                style: TextStyle(fontSize: 14),
+              ),
+              if (_weatherInfo!['wind_speed'] != null) Text(
+                'Wind Speed: ${_weatherInfo!['wind_speed']} m/s',
+                style: TextStyle(fontSize: 14),
+              ),
+              if (_weatherInfo!['description'] != null) Text(
+                'Description: ${_weatherInfo!['description']}',
+                style: TextStyle(fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildClickedLocationWeatherInfo() {
+    return Positioned(
+      top: 130,
+      left: 16,
+      right: 16,
+      child: Card(
+        elevation: 4,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.location_on, color: Colors.red),
+                  SizedBox(width: 8),
+                  Text(
+                    'Weather at Selected Location',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: 8),
+              Row(
+                children: [
+                  if (_clickedLocationWeather!['weather']['icon'] != null)
+                    Image.network(
+                      'https://openweathermap.org/img/wn/${_clickedLocationWeather!['weather']['icon']}@2x.png',
+                      width: 50,
+                      height: 50,
+                    ),
+                  SizedBox(width: 8),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${_clickedLocationWeather!['weather']['city']}',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Text(
+                        '${_clickedLocationWeather!['weather']['condition']}',
+                        style: TextStyle(fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              SizedBox(height: 8),
+              Text(
+                'Temperature: ${_clickedLocationWeather!['weather']['temperature'].toStringAsFixed(1)}°C',
+                style: TextStyle(fontSize: 14),
+              ),
+              Text(
+                'Feels like: ${_clickedLocationWeather!['weather']['feels_like'].toStringAsFixed(1)}°C',
+                style: TextStyle(fontSize: 14),
+              ),
+              Text(
+                'Humidity: ${_clickedLocationWeather!['weather']['humidity']}%',
+                style: TextStyle(fontSize: 14),
+              ),
+              Text(
+                'Wind Speed: ${_clickedLocationWeather!['weather']['wind_speed']} m/s',
+                style: TextStyle(fontSize: 14),
+              ),
+              Text(
+                'Description: ${_clickedLocationWeather!['weather']['description']}',
+                style: TextStyle(fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Color _getTrafficColor(String trafficLevel) {
+    switch (trafficLevel.toLowerCase()) {
+      case 'heavy':
+        return Colors.red;
+      case 'moderate':
+        return Colors.orange;
+      case 'low':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
   Widget _buildTransportModeButton(IconData icon, String label, TransportationMode mode) {
     final bool isSelected = _selectedTransportMode == mode;
-    return InkWell(
-      onTap: () {
+    return ElevatedButton(
+      onPressed: () {
         setState(() {
           _selectedTransportMode = mode;
         });
-        _getRoute();
       },
-      child: Container(
+      style: ElevatedButton.styleFrom(
+        backgroundColor: isSelected ? Colors.cyanAccent[400]!.withOpacity(0.3) : Colors.white.withOpacity(0.3),
+        foregroundColor: isSelected ? Colors.cyanAccent[700] : Colors.black87,
         padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8.0),
+          side: BorderSide(
+            color: isSelected ? Colors.cyanAccent[400]!.withOpacity(0.5) : Colors.grey.withOpacity(0.3),
+            width: 1.0,
+          ),
+        ),
+        elevation: 0,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 20),
+          SizedBox(width: 4),
+          Text(label, style: TextStyle(fontSize: 14)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWeatherButton() {
+    return Positioned(
+      bottom: 100,
+      right: 16,
+      child: FloatingActionButton(
+        onPressed: () async {
+          if (_lastClickedLocation != null) {
+            try {
+              final weatherData = await _mapsService.getWeatherForClickedLocation(_lastClickedLocation!);
+              setState(() {
+                _clickedLocationWeather = weatherData;
+                _showClickedLocationWeather = true;
+              });
+            } catch (e) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Error getting weather: $e')),
+              );
+            }
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Please click on a location first')),
+            );
+          }
+        },
+        child: Icon(Icons.wb_sunny),
+        backgroundColor: Colors.cyanAccent[400]!.withOpacity(0.8),
+      ),
+    );
+  }
+
+  Widget _buildRouteSummaryToggleButton() {
+    if (_routeDuration == null || _routeDistance == null) return SizedBox.shrink();
+    
+    return Positioned(
+      bottom: _showRouteSummaryCard ? 200 : 16,
+      right: 16,
+      child: Container(
         decoration: BoxDecoration(
-          color: isSelected ? Colors.cyanAccent[100] : Colors.white,
-          borderRadius: BorderRadius.circular(8),
+          color: Colors.white.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(30),
           border: Border.all(
-            color: isSelected ? Colors.cyanAccent[700]! : Colors.grey[300]!,
+            color: Colors.cyanAccent[400]!.withOpacity(0.5),
             width: 1,
           ),
         ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              icon,
-              color: isSelected ? Colors.cyanAccent[700] : Colors.grey[600],
-              size: 20,
-            ),
-            SizedBox(width: 8),
-            Text(
-              label,
-              style: TextStyle(
-                color: isSelected ? Colors.cyanAccent[700] : Colors.grey[600],
-                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              setState(() {
+                _showRouteSummaryCard = !_showRouteSummaryCard;
+                _showCurrentLocationTrafficInfo = false;
+                _showCurrentLocationWeatherInfo = false;
+                _showClickedLocationWeather = false;
+              });
+            },
+            borderRadius: BorderRadius.circular(30),
+            child: Padding(
+              padding: EdgeInsets.all(12),
+              child: Icon(
+                _showRouteSummaryCard ? Icons.close : Icons.alt_route,
+                color: Colors.cyanAccent[700],
+                size: 20,
               ),
             ),
-          ],
+          ),
         ),
       ),
     );
