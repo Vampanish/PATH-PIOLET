@@ -1,4 +1,4 @@
 class ApiKeys {
-  static const String googleMapsKey = 'YOUR_GOOGLE_MAPS_API_KEY';
-  static const String openWeatherKey = 'YOUR_OPENWEATHER_API_KEY';
+  static const String googleMapsKey = 'AIzaSyDSgf5lvgOjhac2VNuLnoM13NGF1vgdzx0';
+  static const String openWeatherKey = 'WUSkTL0RK6nmFFUhti6G2-X7SuE=';
 } 

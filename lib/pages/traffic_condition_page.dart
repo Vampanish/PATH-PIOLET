@@ -9,8 +9,17 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_tts/flutter_tts.dart';
 import 'package:intl/intl.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'dart:async';
+import 'dart:math' as math;
 import '../theme_provider.dart';
 import '../config/api_keys.dart';
+import '../utils/language_utils.dart';
+import '../widgets/traffic_alert_card.dart';
+import '../widgets/weather_card.dart';
+import '../widgets/compass_widget.dart';
+import '../widgets/search_bar.dart';
 
 class TrafficConditionPage extends StatefulWidget {
   final ThemeProvider themeProvider;
@@ -42,6 +51,9 @@ class _TrafficConditionPageState extends State<TrafficConditionPage> {
   List<TrafficAlert> _alerts = [];
   List<RouteOption> _routeOptions = [];
   late String _currentLanguage;
+  final TextEditingController _searchController = TextEditingController();
+  bool _showTrafficHistory = false;
+  Map<String, dynamic> _trafficHistory = {};
 
   @override
   void initState() {
@@ -65,10 +77,11 @@ class _TrafficConditionPageState extends State<TrafficConditionPage> {
 
   Future<void> _initializeLocation() async {
     try {
-      final permission = await Geolocator.checkPermission();
+      // Request location permission
+      LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
-        final requestPermission = await Geolocator.requestPermission();
-        if (requestPermission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -80,7 +93,7 @@ class _TrafficConditionPageState extends State<TrafficConditionPage> {
           return;
         }
       }
-      
+
       if (permission == LocationPermission.deniedForever) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -92,9 +105,18 @@ class _TrafficConditionPageState extends State<TrafficConditionPage> {
         }
         return;
       }
-      
-      _currentPosition = await Geolocator.getCurrentPosition();
-      _updateMapCamera();
+
+      // Get current position
+      _currentPosition = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.high,
+      );
+
+      // Update map camera if controller is available
+      if (_mapController != null) {
+        _updateMapCamera();
+      }
+
+      // Load weather data
       _loadWeatherData();
     } catch (e) {
       if (mounted) {
@@ -205,68 +227,137 @@ class _TrafficConditionPageState extends State<TrafficConditionPage> {
 
   Future<void> _loadTrafficData() async {
     setState(() => _isLoading = true);
-    // Simulate API call
-    await Future.delayed(const Duration(seconds: 1));
     
-    // Sample data with multilingual messages
-    _alerts = [
-      TrafficAlert(
-        type: AlertType.accident,
-        message: _currentLanguage == 'hi' ? 'आगे 1 किलोमीटर दुर्घटना की सूचना' :
-                _currentLanguage == 'ta' ? 'முன்னால் 1 கிலோமீட்டரில் விபத்து அறிக்கை' :
-                _currentLanguage == 'bn' ? 'সামনে 1 কিলোমিটার দুর্ঘটনার রিপোর্ট' :
-                'Accident reported 1km ahead',
-        location: const LatLng(37.7749, -122.4194),
-        severity: AlertSeverity.high,
-      ),
-      TrafficAlert(
-        type: AlertType.construction,
-        message: _currentLanguage == 'hi' ? 'सड़क निर्माण कार्य जारी' :
-                _currentLanguage == 'ta' ? 'சாலை பணிகள் நடைபெற்று வருகின்றன' :
-                _currentLanguage == 'bn' ? 'রাস্তার কাজ চলছে' :
-                'Road work in progress',
-        location: const LatLng(37.7833, -122.4167),
-        severity: AlertSeverity.medium,
-      ),
-    ];
+    try {
+      if (_currentPosition == null) {
+        throw Exception('Current position not available');
+      }
 
-    _routeOptions = [
-      RouteOption(
-        name: _currentLanguage == 'hi' ? 'सबसे तेज़ मार्ग' :
-              _currentLanguage == 'ta' ? 'வேகமான பாதை' :
-              _currentLanguage == 'bn' ? 'দ্রুততম রুট' :
-              'Fastest Route',
-        duration: const Duration(minutes: 25),
-        distance: 12.5,
-        type: RouteType.fastest,
-      ),
-      RouteOption(
-        name: _currentLanguage == 'hi' ? 'सुंदर मार्ग' :
-              _currentLanguage == 'ta' ? 'அழகிய பாதை' :
-              _currentLanguage == 'bn' ? 'সুন্দর রুট' :
-              'Scenic Route',
-        duration: const Duration(minutes: 35),
-        distance: 15.0,
-        type: RouteType.scenic,
-      ),
-      RouteOption(
-        name: _currentLanguage == 'hi' ? 'AI अनुशंसित' :
-              _currentLanguage == 'ta' ? 'AI பரிந்துரைக்கப்பட்டது' :
-              _currentLanguage == 'bn' ? 'AI সুপারিশকৃত' :
-              'AI Recommended',
-        duration: const Duration(minutes: 28),
-        distance: 13.2,
-        type: RouteType.aiRecommended,
-      ),
-    ];
+      // Fetch traffic data from Google Maps API
+      final response = await http.get(
+        Uri.parse(
+          'https://maps.googleapis.com/maps/api/directions/json?origin=${_currentPosition!.latitude},${_currentPosition!.longitude}&destination=${_currentPosition!.latitude + 0.1},${_currentPosition!.longitude + 0.1}&key=${ApiKeys.googleMapsKey}&traffic_model=best_guess&departure_time=now'
+        ),
+      );
 
-    _updateMapMarkers();
-    setState(() => _isLoading = false);
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        
+        if (data['status'] == 'OK') {
+          // Process routes
+          _routeOptions = [];
+          for (var route in data['routes']) {
+            final legs = route['legs'][0];
+            final duration = Duration(seconds: legs['duration_in_traffic']?['value'] ?? legs['duration']['value']);
+            final distance = legs['distance']['value'] / 1000; // Convert to kilometers
+            
+            _routeOptions.add(
+              RouteOption(
+                name: _currentLanguage == 'hi' ? 'सबसे तेज़ मार्ग' :
+                      _currentLanguage == 'ta' ? 'வேகமான பாதை' :
+                      _currentLanguage == 'bn' ? 'দ্রুততম রুট' :
+                      'Fastest Route',
+                duration: duration,
+                distance: distance,
+                type: RouteType.fastest,
+              ),
+            );
 
-    // Speak the first alert
-    if (_alerts.isNotEmpty) {
-      _speak(_alerts[0].message);
+            // Add polylines for the route
+            final points = _decodePolyline(route['overview_polyline']['points']);
+            _polylines.add(
+              Polyline(
+                polylineId: const PolylineId('route'),
+                points: points,
+                color: Colors.blue,
+                width: 5,
+              ),
+            );
+          }
+
+          // Fetch traffic incidents
+          final incidentsResponse = await http.get(
+            Uri.parse(
+              'https://maps.googleapis.com/maps/api/roads/snapToRoads?path=${_currentPosition!.latitude},${_currentPosition!.longitude}&key=${ApiKeys.googleMapsKey}'
+            ),
+          );
+
+          if (incidentsResponse.statusCode == 200) {
+            final incidentsData = json.decode(incidentsResponse.body);
+            
+            _alerts = [];
+            if (incidentsData['snappedPoints'] != null) {
+              for (var point in incidentsData['snappedPoints']) {
+                _alerts.add(
+                  TrafficAlert(
+                    type: AlertType.accident,
+                    message: _currentLanguage == 'hi' ? 'ट्रैफिक जाम की सूचना' :
+                            _currentLanguage == 'ta' ? 'போக்குவரத்து நெரிசல் அறிக்கை' :
+                            _currentLanguage == 'bn' ? 'ট্র্যাফিক জ্যাম রিপোর্ট' :
+                            'Traffic congestion reported',
+                    location: LatLng(point['location']['latitude'], point['location']['longitude']),
+                    severity: AlertSeverity.medium,
+                  ),
+                );
+              }
+            }
+          }
+
+          // Update map markers
+          _updateMapMarkers();
+          
+          // Speak the first alert if available
+          if (_alerts.isNotEmpty) {
+            _speak(_alerts[0].message);
+          }
+        } else {
+          throw Exception('Failed to load traffic data: ${data['status']}');
+        }
+      } else {
+        throw Exception('Failed to load traffic data: ${response.statusCode}');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error loading traffic data: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      setState(() => _isLoading = false);
     }
+  }
+
+  List<LatLng> _decodePolyline(String encoded) {
+    List<LatLng> poly = [];
+    int index = 0, len = encoded.length;
+    int lat = 0, lng = 0;
+
+    while (index < len) {
+      int b, shift = 0, result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1F) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlat = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lat += dlat;
+
+      shift = 0;
+      result = 0;
+      do {
+        b = encoded.codeUnitAt(index++) - 63;
+        result |= (b & 0x1F) << shift;
+        shift += 5;
+      } while (b >= 0x20);
+      int dlng = ((result & 1) != 0 ? ~(result >> 1) : (result >> 1));
+      lng += dlng;
+
+      poly.add(LatLng(lat / 1E5, lng / 1E5));
+    }
+    return poly;
   }
 
   void _updateMapMarkers() {
@@ -307,7 +398,7 @@ class _TrafficConditionPageState extends State<TrafficConditionPage> {
         children: [
           // Map View
           GoogleMap(
-            onMapCreated: (controller) {
+            onMapCreated: (GoogleMapController controller) {
               _mapController = controller;
               setState(() => _isMapLoading = false);
               _updateMapCamera();
@@ -315,7 +406,7 @@ class _TrafficConditionPageState extends State<TrafficConditionPage> {
             initialCameraPosition: CameraPosition(
               target: _currentPosition != null
                   ? LatLng(_currentPosition!.latitude, _currentPosition!.longitude)
-                  : const LatLng(37.7749, -122.4194),
+                  : const LatLng(37.7749, -122.4194), // Default to San Francisco
               zoom: 15,
             ),
             myLocationEnabled: true,
@@ -326,6 +417,83 @@ class _TrafficConditionPageState extends State<TrafficConditionPage> {
             compassEnabled: true,
             mapToolbarEnabled: true,
             zoomControlsEnabled: true,
+            onCameraMove: (CameraPosition position) {
+              // Handle camera movement if needed
+            },
+            onCameraIdle: () {
+              // Handle camera idle if needed
+            },
+          ),
+
+          // Search Bar
+          Positioned(
+            top: 16,
+            left: 16,
+            right: 16,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: 'Search location...',
+                  prefixIcon: const Icon(Icons.search),
+                  suffixIcon: IconButton(
+                    icon: const Icon(Icons.clear),
+                    onPressed: () {
+                      _searchController.clear();
+                    },
+                  ),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                ),
+                onSubmitted: (value) {
+                  if (value.isNotEmpty) {
+                    _searchLocation(value);
+                  }
+                },
+              ),
+            ),
+          ),
+
+          // Traffic History Toggle
+          Positioned(
+            top: 80,
+            right: 16,
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: SwitchListTile(
+                title: const Text('Traffic History'),
+                value: _showTrafficHistory,
+                onChanged: (value) {
+                  setState(() {
+                    _showTrafficHistory = value;
+                    if (value) {
+                      _loadTrafficHistory();
+                    }
+                  });
+                },
+              ),
+            ),
           ),
 
           // Weather Overlay
@@ -387,9 +555,21 @@ class _TrafficConditionPageState extends State<TrafficConditionPage> {
             ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _loadTrafficData,
-        child: const Icon(Icons.refresh),
+      floatingActionButton: Column(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          FloatingActionButton(
+            heroTag: 'refresh',
+            onPressed: _loadTrafficData,
+            child: const Icon(Icons.refresh),
+          ),
+          const SizedBox(height: 16),
+          FloatingActionButton(
+            heroTag: 'notifications',
+            onPressed: _toggleNotifications,
+            child: const Icon(Icons.notifications),
+          ),
+        ],
       ),
     );
   }
@@ -447,7 +627,7 @@ class _TrafficConditionPageState extends State<TrafficConditionPage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Traffic will slow down in 15 mins ahead on this route',
+                    _getTrafficPrediction(),
                     style: TextStyle(
                       color: Colors.grey[600],
                     ),
@@ -472,12 +652,10 @@ class _TrafficConditionPageState extends State<TrafficConditionPage> {
                     ),
                     title: Text(route.name),
                     subtitle: Text(
-                      '${route.duration.inMinutes} mins • ${route.distance} km',
+                      '${route.duration.inMinutes} mins • ${route.distance.toStringAsFixed(1)} km',
                     ),
                     trailing: const Icon(Icons.arrow_forward_ios),
-                    onTap: () {
-                      // Handle route selection
-                    },
+                    onTap: () => _selectRoute(route),
                   ),
                 );
               },
@@ -533,20 +711,20 @@ class _TrafficConditionPageState extends State<TrafficConditionPage> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
-                  'Traffic Information',
-                  style: TextStyle(
+                Text(
+                  '${_alerts.length} Traffic Alerts',
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                Icon(
-                  Icons.keyboard_arrow_up,
-                  color: Colors.grey[600],
+                IconButton(
+                  icon: const Icon(Icons.arrow_upward),
+                  onPressed: () => _panelController.open(),
                 ),
               ],
             ),
@@ -635,6 +813,79 @@ class _TrafficConditionPageState extends State<TrafficConditionPage> {
       case AlertSeverity.low:
         return Colors.yellow;
     }
+  }
+
+  String _getTrafficPrediction() {
+    if (_routeOptions.isEmpty) return 'No traffic data available';
+    
+    final fastestRoute = _routeOptions.first;
+    final currentTime = DateTime.now();
+    final hour = currentTime.hour;
+    
+    // Simple prediction based on time of day and current traffic
+    if (hour >= 7 && hour <= 9) {
+      return 'Morning rush hour - Expect heavy traffic';
+    } else if (hour >= 16 && hour <= 18) {
+      return 'Evening rush hour - Traffic will increase';
+    } else if (fastestRoute.duration.inMinutes > 30) {
+      return 'Heavy traffic ahead - Consider alternate route';
+    } else {
+      return 'Traffic conditions are good';
+    }
+  }
+
+  void _selectRoute(RouteOption route) {
+    // Implement route selection logic
+    _mapController.animateCamera(
+      CameraUpdate.newCameraPosition(
+        CameraPosition(
+          target: _currentPosition != null
+              ? LatLng(_currentPosition!.latitude, _currentPosition!.longitude)
+              : const LatLng(37.7749, -122.4194),
+          zoom: 15,
+        ),
+      ),
+    );
+    
+    // Show route on map
+    setState(() {
+      _polylines = {
+        Polyline(
+          polylineId: const PolylineId('selected_route'),
+          points: _getRoutePoints(route),
+          color: _getRouteColor(route.type),
+          width: 5,
+        ),
+      };
+    });
+  }
+
+  List<LatLng> _getRoutePoints(RouteOption route) {
+    // Implement route points generation
+    // This should use the actual route data from the API
+    return [];
+  }
+
+  void _toggleNotifications() {
+    // Implement notification toggle logic
+  }
+
+  Future<void> _loadTrafficHistory() async {
+    // Implement traffic history loading
+    setState(() {
+      _trafficHistory = {
+        'yesterday': {
+          '6PM': 'Heavy',
+          '7PM': 'Moderate',
+          '8PM': 'Light',
+        },
+        'today': {
+          '6PM': 'Moderate',
+          '7PM': 'Heavy',
+          '8PM': 'Moderate',
+        },
+      };
+    });
   }
 }
 
