@@ -184,8 +184,8 @@ class _MapsHomePageState extends State<MapsHomePage> {
       return;
     }
 
-    final String apiKey = 'AIzaSyDSgf5lvgOjhac2VNuLnoM13NGF1vgdzx0';
-    final String signature = 'WUSkTL0RK6nmFFUhti6G2-X7SuE=';
+    final String apiKey = 'API_KEY';
+    final String signature = 'SECRET_KEY';
     final String url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json'
         '?input=${Uri.encodeComponent(input)}'
         '&key=$apiKey'
