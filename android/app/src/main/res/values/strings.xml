@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">networks</string>
+    <!-- TODO: Replace with your actual Google Maps API key from Google Cloud Console -->
+    <string name="google_maps_key">AIzaSyDSgf5lvgOjhac2VNuLnoM13NGF1vgdzx0</string>
+</resources> 

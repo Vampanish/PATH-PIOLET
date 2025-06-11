@@ -1,23 +1,23 @@
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
 import '../theme_provider.dart';
 import 'language_selection_page.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 
-class AnimatedLoginPage extends StatefulWidget {
+class LoginPage extends StatefulWidget {
   final ThemeProvider themeProvider;
-  const AnimatedLoginPage({super.key, required this.themeProvider});
+  const LoginPage({super.key, required this.themeProvider});
 
   @override
-  State<AnimatedLoginPage> createState() => _AnimatedLoginPageState();
+  State<LoginPage> createState() => _LoginPageState();
 }
 
-class _AnimatedLoginPageState extends State<AnimatedLoginPage>
-    with SingleTickerProviderStateMixin {
+class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
   bool _isLoading = false;
   bool _isPasswordVisible = false;
+  late FlutterTts flutterTts;
 
   @override
   void initState() {
@@ -35,6 +35,8 @@ class _AnimatedLoginPageState extends State<AnimatedLoginPage>
         .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
     _controller.forward();
+
+    flutterTts = FlutterTts();
   }
 
   @override
@@ -59,6 +61,7 @@ class _AnimatedLoginPageState extends State<AnimatedLoginPage>
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+    final isDark = widget.themeProvider.isDarkMode;
 
     return Scaffold(
       appBar: AppBar(
@@ -67,17 +70,11 @@ class _AnimatedLoginPageState extends State<AnimatedLoginPage>
         actions: [
           IconButton(
             icon: Icon(
-              widget.themeProvider.value == ThemeMode.dark
-                  ? Icons.dark_mode
-                  : Icons.light_mode,
-              color: Theme.of(context).colorScheme.onPrimary,
+              isDark ? Icons.light_mode : Icons.dark_mode,
+              color: Colors.white,
             ),
             onPressed: () {
-              widget.themeProvider.setTheme(
-                widget.themeProvider.value == ThemeMode.dark
-                    ? ThemeMode.light
-                    : ThemeMode.dark,
-              );
+              widget.themeProvider.toggleTheme();
             },
             tooltip: 'Toggle Theme',
           ),
@@ -92,11 +89,15 @@ class _AnimatedLoginPageState extends State<AnimatedLoginPage>
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
-                colors: [
-                  const Color(0xFF1A237E), // Deep blue
-                  const Color(0xFF0D47A1), // Medium blue
-                  const Color(0xFF01579B), // Light blue
-                ],
+                colors: isDark 
+                  ? [
+                      Colors.grey[900]!,
+                      Colors.grey[800]!,
+                    ]
+                  : [
+                      const Color(0xFF0D47A1),
+                      const Color(0xFF0D47A1).withOpacity(0.8),
+                    ],
               ),
             ),
           ),
@@ -105,17 +106,6 @@ class _AnimatedLoginPageState extends State<AnimatedLoginPage>
           Positioned.fill(
             child: CustomPaint(
               painter: TrafficGridPainter(),
-            ),
-          ),
-          
-          // Animated traffic background
-          Positioned.fill(
-            child: Opacity(
-              opacity: 0.2,
-              child: Lottie.asset(
-                'assets/traffic_animation.json',
-                fit: BoxFit.cover,
-              ),
             ),
           ),
 

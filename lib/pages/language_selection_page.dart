@@ -1,44 +1,43 @@
 import 'package:flutter/material.dart';
 import '../theme_provider.dart';
-import 'language_welcome_page.dart';
+import 'voice_instruction_page.dart';
 
 class LanguageSelectionPage extends StatelessWidget {
   final ThemeProvider themeProvider;
-  final List<Map<String, String>> languages = [
-    {'name': 'English', 'code': 'en'},
-    {'name': 'हिन्दी', 'code': 'hi'},
-    {'name': 'தமிழ்', 'code': 'ta'},
-    {'name': 'বাংলা', 'code': 'bn'},
-    {'name': 'తెలుగు', 'code': 'te'},
-    {'name': 'मराठी', 'code': 'mr'},
-    {'name': 'ગુજરાતી', 'code': 'gu'},
-    {'name': 'ಕನ್ನಡ', 'code': 'kn'},
-    {'name': 'മലയാളം', 'code': 'ml'},
-    {'name': 'ਪੰਜਾਬੀ', 'code': 'pa'},
-  ];
 
-  LanguageSelectionPage({super.key, required this.themeProvider});
+  const LanguageSelectionPage({
+    super.key,
+    required this.themeProvider,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final isDark = themeProvider.isDarkMode;
+
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: isDark ? Colors.grey[900] : Colors.blue[900],
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          'Select Language',
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.95),
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         actions: [
           IconButton(
             icon: Icon(
-              themeProvider.value == ThemeMode.dark
-                  ? Icons.dark_mode
-                  : Icons.light_mode,
-              color: Theme.of(context).colorScheme.onPrimary,
+              isDark ? Icons.light_mode : Icons.dark_mode,
+              color: Colors.white,
             ),
             onPressed: () {
-              themeProvider.setTheme(
-                themeProvider.value == ThemeMode.dark
-                    ? ThemeMode.light
-                    : ThemeMode.dark,
-              );
+              themeProvider.toggleTheme();
             },
             tooltip: 'Toggle Theme',
           ),
@@ -46,75 +45,105 @@ class LanguageSelectionPage extends StatelessWidget {
       ),
       extendBodyBehindAppBar: true,
       body: Container(
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF1A237E),
-              Color(0xFF0D47A1),
-              Color(0xFF00E5FF),
-            ],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: isDark 
+              ? [
+                  Colors.grey[900]!,
+                  Colors.grey[800]!,
+                ]
+              : [
+                  const Color(0xFF0D47A1),
+                  const Color(0xFF0D47A1).withOpacity(0.8),
+                ],
           ),
         ),
-        child: Center(
+        child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            padding: const EdgeInsets.all(24.0),
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                const SizedBox(height: 40),
                 Text(
                   'Choose Your Language',
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.95),
-                    fontSize: 28,
+                    fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    letterSpacing: 1.1,
-                    shadows: [
-                      Shadow(
-                        color: Colors.black.withOpacity(0.2),
-                        blurRadius: 6,
-                        offset: Offset(2, 2),
-                      ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Select your preferred language for voice instructions',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Expanded(
+                  child: ListView(
+                    children: [
+                      _buildLanguageCard(context, 'English', 'en', isDark),
+                      _buildLanguageCard(context, 'हिंदी (Hindi)', 'hi', isDark),
+                      _buildLanguageCard(context, 'தமிழ் (Tamil)', 'ta', isDark),
+                      _buildLanguageCard(context, 'বাংলা (Bengali)', 'bn', isDark),
+                      _buildLanguageCard(context, 'తెలుగు (Telugu)', 'te', isDark),
+                      _buildLanguageCard(context, 'मराठी (Marathi)', 'mr', isDark),
+                      _buildLanguageCard(context, 'ગુજરાતી (Gujarati)', 'gu', isDark),
+                      _buildLanguageCard(context, 'ಕನ್ನಡ (Kannada)', 'kn', isDark),
+                      _buildLanguageCard(context, 'മലയാളം (Malayalam)', 'ml', isDark),
+                      _buildLanguageCard(context, 'ਪੰਜਾਬੀ (Punjabi)', 'pa', isDark),
                     ],
                   ),
                 ),
-                const SizedBox(height: 40),
-                ...languages.map((lang) => Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8.0),
-                  child: SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF00E5FF),
-                        foregroundColor: const Color(0xFF0D47A1),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        textStyle: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        elevation: 4,
-                        shadowColor: Colors.cyanAccent.withOpacity(0.2),
-                      ),
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => LanguageWelcomePage(language: lang['name']!, themeProvider: themeProvider),
-                          ),
-                        );
-                      },
-                      child: Text(lang['name']!),
-                    ),
-                  ),
-                )),
               ],
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildLanguageCard(BuildContext context, String languageName, String languageCode, bool isDark) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      color: isDark 
+        ? Colors.grey[800]!.withOpacity(0.5)
+        : Colors.white.withOpacity(0.1),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: isDark 
+            ? Colors.grey[700]!.withOpacity(0.5)
+            : Colors.white.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        title: Text(
+          languageName,
+          style: TextStyle(
+            color: Colors.white.withOpacity(0.95),
+            fontSize: 18,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        onTap: () {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => VoiceInstructionPage(
+                themeProvider: themeProvider,
+                initialLanguage: languageCode,
+              ),
+            ),
+          );
+        },
       ),
     );
   }
