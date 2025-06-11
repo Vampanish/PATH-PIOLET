@@ -418,4 +418,24 @@ static const String _weatherApiKey = 'WEATHER_API_KEY';
       'icon_url': getWeatherIconUrl(weatherData['icon']),
     };
   }
+
+  Future<String?> getAddressFromLatLng(LatLng location) async {
+    final String url = 'https://maps.googleapis.com/maps/api/geocode/json?'
+        'latlng=${location.latitude},${location.longitude}'
+        '&key=$_googleApiKey';
+
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['results'] != null && data['results'].isNotEmpty) {
+          return data['results'][0]['formatted_address'];
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error getting address from coordinates: $e');
+      return null;
+    }
+  }
 } 

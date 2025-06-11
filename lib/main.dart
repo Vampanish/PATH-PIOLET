@@ -295,15 +295,11 @@ class _MapsHomePageState extends State<MapsHomePage> {
 
   Future<void> _getRoute() async {
     if (!_isMapReady) {
-      print("Map is not yet ready. Please wait for initialization to complete.");
       return;
     }
     if (_sourceController.text.isEmpty || _destinationController.text.isEmpty) {
-      print("Source or Destination is empty.");
       return;
     }
-
-    print("Attempting to get route from: ${_sourceController.text} to: ${_destinationController.text}");
     
     setState(() {
       _clearMap();
@@ -321,8 +317,7 @@ class _MapsHomePageState extends State<MapsHomePage> {
         _selectedTransportMode,
       );
 
-      if (data['routes'] != null && data['routes'].isNotEmpty) {
-        print("Route data received. Processing ${data['routes'].length} routes.");
+      if (data != null && data['routes'] != null && data['routes'].isNotEmpty) {
         setState(() {
           _processRoutes(data['routes']);
           if (data['destination_weather'] != null) {
@@ -333,13 +328,29 @@ class _MapsHomePageState extends State<MapsHomePage> {
           }
           _showRouteSummaryCard = true;
         });
-      } else if (data['status'] == 'ZERO_RESULTS') {
-        print("No route found for the given locations.");
-      } else {
-        print("Google Directions API Error: ${data['error_message'] ?? 'Unknown error'}");
+      } else if (data != null && data['status'] == 'ZERO_RESULTS') {
+        String message = 'No routes available';
+        if (_selectedTransportMode == TransportationMode.walking) {
+          message = 'Walking route not available';
+        } else if (_selectedTransportMode == TransportationMode.bicycling) {
+          message = 'Biking route not available';
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(message),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
       }
     } catch (e) {
-      print('Error fetching route: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to find route'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
+        ),
+      );
     }
   }
 
@@ -738,18 +749,60 @@ class _MapsHomePageState extends State<MapsHomePage> {
           color: Colors.cyanAccent[400]!.withOpacity(0.5),
           width: 1,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 4,
+            offset: Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          CompositedTransformTarget(
-            link: _sourceLayerLink,
-            child: TextField(
-              controller: _sourceController,
-              focusNode: _sourceFocusNode,
-              decoration: _buildTextFieldDecoration('Enter Source'),
-              onChanged: (value) => _getPlaceSuggestions(value, true),
-              style: TextStyle(fontSize: 14.0, color: Colors.black87),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: CompositedTransformTarget(
+                  link: _sourceLayerLink,
+                  child: TextField(
+                    controller: _sourceController,
+                    focusNode: _sourceFocusNode,
+                    decoration: _buildTextFieldDecoration('Enter Source', _sourceController),
+                    onChanged: (value) {
+                      setState(() {});
+                      _getPlaceSuggestions(value, true);
+                    },
+                    style: TextStyle(fontSize: 14.0, color: Colors.black87),
+                  ),
+                ),
+              ),
+              SizedBox(width: 8),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.cyanAccent[400]!.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.cyanAccent[400]!.withOpacity(0.5),
+                    width: 1,
+                  ),
+                ),
+                child: IconButton(
+                  onPressed: () async {
+                    final location = await _locationService.getCurrentLocation();
+                    if (location != null) {
+                      final address = await _mapsService.getAddressFromLatLng(location);
+                      if (address != null) {
+                        setState(() {
+                          _sourceController.text = address;
+                        });
+                      }
+                    }
+                  },
+                  icon: Icon(Icons.my_location, color: Colors.cyanAccent[700]),
+                  tooltip: 'Use current location',
+                ),
+              ),
+            ],
           ),
           SizedBox(height: 10),
           CompositedTransformTarget(
@@ -757,8 +810,11 @@ class _MapsHomePageState extends State<MapsHomePage> {
             child: TextField(
               controller: _destinationController,
               focusNode: _destinationFocusNode,
-              decoration: _buildTextFieldDecoration('Enter Destination'),
-              onChanged: (value) => _getPlaceSuggestions(value, false),
+              decoration: _buildTextFieldDecoration('Enter Destination', _destinationController),
+              onChanged: (value) {
+                setState(() {});
+                _getPlaceSuggestions(value, false);
+              },
               style: TextStyle(fontSize: 14.0, color: Colors.black87),
             ),
           ),
@@ -810,11 +866,20 @@ class _MapsHomePageState extends State<MapsHomePage> {
     );
   }
 
-  InputDecoration _buildTextFieldDecoration(String hintText) {
+  InputDecoration _buildTextFieldDecoration(String hintText, TextEditingController controller) {
     return InputDecoration(
       hintText: hintText,
-      hintStyle: TextStyle(fontSize: 14.0),
+      hintStyle: TextStyle(fontSize: 14.0, color: Colors.grey[600]),
       prefixIcon: Icon(Icons.location_on, color: Colors.cyanAccent[400], size: 20.0),
+      suffixIcon: controller.text.isNotEmpty
+          ? IconButton(
+              icon: Icon(Icons.clear, color: Colors.grey[600], size: 20.0),
+              onPressed: () {
+                controller.clear();
+                setState(() {});
+              },
+            )
+          : null,
       fillColor: Colors.white.withOpacity(0.9),
       filled: true,
       border: OutlineInputBorder(
@@ -856,6 +921,7 @@ class _MapsHomePageState extends State<MapsHomePage> {
       mapType: MapType.normal,
       zoomControlsEnabled: true,
       compassEnabled: true,
+      mapToolbarEnabled: false,
       polylines: _polylines,
       markers: _markers.union(_nearbyPlacesMarkers).union(
         _lastClickedLocation != null && !_showRouteSummaryCard ? {
@@ -864,6 +930,13 @@ class _MapsHomePageState extends State<MapsHomePage> {
             position: _lastClickedLocation!,
             icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure),
             infoWindow: InfoWindow(title: 'Clicked Location'),
+            onTap: () {
+              setState(() {
+                _lastClickedLocation = null;
+                _showClickedLocationWeather = false;
+                _clickedLocationWeather = null;
+              });
+            },
           )
         } : {}
       ),
@@ -873,7 +946,6 @@ class _MapsHomePageState extends State<MapsHomePage> {
           _showClickedLocationWeather = false;
           _clickedLocationWeather = null;
           _showRouteSummaryCard = false;
-          _markers.removeWhere((marker) => marker.markerId.value == 'clicked_location');
         });
       },
     );
