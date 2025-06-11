@@ -3,8 +3,10 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
 import 'services/maps_service.dart';
 import 'services/location_service.dart';
+import 'services/offline_route_service.dart';
 import 'widgets/route_info_card.dart';
 import 'models/route_model.dart';
+import 'screens/offline_routes_screen.dart';
 import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -55,6 +57,7 @@ class MapsHomePage extends StatefulWidget {
 class _MapsHomePageState extends State<MapsHomePage> {
   final MapsService _mapsService = MapsService();
   final LocationService _locationService = LocationService();
+  final OfflineRouteService _offlineRouteService = OfflineRouteService();
   GoogleMapController? mapController;
   
   final TextEditingController _sourceController = TextEditingController();
@@ -183,8 +186,8 @@ class _MapsHomePageState extends State<MapsHomePage> {
       return;
     }
 
-    final String apiKey = 'API_KEYS';
-    final String signature = 'SECRET_KEY';
+    final String apiKey = 'API_KEY';
+    final String signature = 'SIGNATURE';
     final String url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json'
         '?input=${Uri.encodeComponent(input)}'
         '&key=$apiKey'
@@ -552,6 +555,94 @@ class _MapsHomePageState extends State<MapsHomePage> {
     }
   }
 
+  Future<void> _downloadRouteForOffline() async {
+    if (_sourceController.text.isEmpty || _destinationController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter source and destination')),
+      );
+      return;
+    }
+
+    try {
+      final routeName = await _showRouteNameDialog();
+      if (routeName == null) return;
+
+      final data = await _mapsService.getRoute(
+        _sourceController.text,
+        _destinationController.text,
+        _selectedTransportMode,
+      );
+
+      if (data['routes'] != null && data['routes'].isNotEmpty) {
+        final route = data['routes'][0];
+        final polyline = route['overview_polyline']['points'];
+        final polylinePoints = PolylinePoints();
+        final pointCoords = polylinePoints.decodePolyline(polyline);
+        
+        final routePoints = pointCoords
+            .map((point) => LatLng(point.latitude, point.longitude))
+            .toList();
+
+        final leg = route['legs'][0];
+        final duration = leg['duration']['text'];
+        final distance = leg['distance']['text'];
+
+        await _offlineRouteService.saveRoute(
+          name: routeName,
+          sourceAddress: _sourceController.text,
+          destinationAddress: _destinationController.text,
+          routePoints: routePoints,
+          duration: duration,
+          distance: distance,
+          transportMode: _selectedTransportMode,
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Route downloaded successfully')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error downloading route: $e')),
+        );
+      }
+    }
+  }
+
+  Future<String?> _showRouteNameDialog() async {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Save Route'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(
+            labelText: 'Route Name',
+            hintText: 'Enter a name for this route',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              if (controller.text.isNotEmpty) {
+                Navigator.pop(context, controller.text);
+              }
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -569,11 +660,25 @@ class _MapsHomePageState extends State<MapsHomePage> {
                     bottom: 16,
                     left: 16,
                     right: 16,
-                    child: RouteInfoCard(
-                      duration: _routeDuration!,
-                      distance: _routeDistance!,
-                      routeColor: _routeColor,
-                      alternativeRoutesCount: _alternativeRoutes.length,
+                    child: Column(
+                      children: [
+                        RouteInfoCard(
+                          duration: _routeDuration!,
+                          distance: _routeDistance!,
+                          routeColor: _routeColor,
+                          alternativeRoutesCount: _alternativeRoutes.length,
+                        ),
+                        const SizedBox(height: 8),
+                        ElevatedButton.icon(
+                          onPressed: _downloadRouteForOffline,
+                          icon: const Icon(Icons.download),
+                          label: const Text('Download for Offline'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blue,
+                            foregroundColor: Colors.white,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 _buildAppTitle(),
@@ -587,9 +692,19 @@ class _MapsHomePageState extends State<MapsHomePage> {
       bottomNavigationBar: BottomNavigationBar(
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.explore), label: 'Explore'),
+          BottomNavigationBarItem(icon: Icon(Icons.download), label: 'Offline'),
           BottomNavigationBarItem(icon: Icon(Icons.person), label: 'You'),
-          BottomNavigationBarItem(icon: Icon(Icons.add), label: 'Contribute'),
         ],
+        onTap: (index) {
+          if (index == 1) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => const OfflineRoutesScreen(),
+              ),
+            );
+          }
+        },
       ),
     );
   }

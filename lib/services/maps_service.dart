@@ -10,8 +10,8 @@ enum TransportationMode {
 }
 
 class MapsService {
-  static const String _googleApiKey = 'API_KEYS';
-  static const String _signature = 'SECRET_KEY';
+  static const String _googleApiKey = 'API_KEY';
+  static const String _signature = 'SIGNATURE';
 
   Future<Map<String, dynamic>> getRoute(
     String origin, 
