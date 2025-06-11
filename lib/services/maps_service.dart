@@ -10,8 +10,13 @@ enum TransportationMode {
 }
 
 class MapsService {
-  static const String _googleApiKey = 'API_KEYS';
-  static const String _signature = 'SECRET_KEY';
+  static const String _googleApiKey = 'AIzaSyDSgf5lvgOjhac2VNuLnoM13NGF1vgdzx0';
+  static const String _signature = 'WUSkTL0RK6nmFFUhti6G2-X7SuE=';
+  static const String _weatherApiKey = '09e20e71f270d4f9493c1f1292432a5b';
+
+  // Cache for weather data to avoid too many API calls
+  final Map<String, Map<String, dynamic>> _weatherCache = {};
+  DateTime? _lastWeatherUpdate;
 
   Future<Map<String, dynamic>> getRoute(
     String origin, 
@@ -137,72 +142,101 @@ class MapsService {
   }
 
   Future<Map<String, dynamic>> getTrafficConditions(LatLng location) async {
-    final String url = 'https://maps.googleapis.com/maps/api/geocode/json?'
+    // Use Geocoding API to get the address for the current location
+    final String geocodeUrl = 'https://maps.googleapis.com/maps/api/geocode/json?'
         'latlng=${location.latitude},${location.longitude}'
-        '&key=$_googleApiKey'
-        '&signature=$_signature';
+        '&key=$_googleApiKey';
 
+    String address = 'Unknown Location';
     try {
-      final response = await http.get(Uri.parse(url));
+      final response = await http.get(Uri.parse(geocodeUrl));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         if (data['results'] != null && data['results'].isNotEmpty) {
-          final address = data['results'][0]['formatted_address'];
-          return {
-            'address': address,
-            'traffic_level': await _getTrafficLevel(location),
-          };
+          address = data['results'][0]['formatted_address'];
         }
       }
-      throw Exception('Failed to load traffic conditions: ${response.statusCode}');
     } catch (e) {
-      throw Exception('Error fetching traffic conditions: $e');
+      print('Error getting address for traffic: $e');
+      // Continue even if address lookup fails
     }
+
+    return {
+      'address': address,
+      'traffic_level': await _getTrafficLevel(location),
+      'location': {
+        'latitude': location.latitude,
+        'longitude': location.longitude,
+      }
+    };
   }
 
   Future<String> _getTrafficLevel(LatLng location) async {
-    // This is a simplified version. In a real app, you would use a traffic API
-    // For now, we'll return a random traffic level for demonstration
-    final levels = ['Low', 'Moderate', 'Heavy'];
-    return levels[DateTime.now().millisecondsSinceEpoch % 3];
+    // Since we don't have access to real-time traffic data API,
+    // we'll use a simplified traffic level estimation based on time of day
+    final hour = DateTime.now().hour;
+    
+    if (hour >= 7 && hour <= 9) {
+      return 'Heavy'; // Morning rush hour
+    } else if (hour >= 16 && hour <= 18) {
+      return 'Heavy'; // Evening rush hour
+    } else if (hour >= 10 && hour <= 15) {
+      return 'Moderate'; // Daytime
+    } else {
+      return 'Low'; // Night time
+    }
   }
 
   Future<Map<String, dynamic>> getWeatherInfo(LatLng location) async {
-    final String url = 'https://maps.googleapis.com/maps/api/geocode/json?'
-        'latlng=${location.latitude},${location.longitude}'
-        '&key=$_googleApiKey'
-        '&signature=$_signature';
+    final String cacheKey = '${location.latitude},${location.longitude}';
+    
+    // Check if we have cached data that's less than 10 minutes old
+    if (_weatherCache.containsKey(cacheKey) && _lastWeatherUpdate != null) {
+      final cacheAge = DateTime.now().difference(_lastWeatherUpdate!);
+      if (cacheAge.inMinutes < 10) {
+        return _weatherCache[cacheKey]!;
+      }
+    }
+
+    final String url = 'https://api.openweathermap.org/data/2.5/weather?'
+        'lat=${location.latitude}'
+        '&lon=${location.longitude}'
+        '&units=metric'
+        '&appid=$_weatherApiKey';
 
     try {
       final response = await http.get(Uri.parse(url));
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data['results'] != null && data['results'].isNotEmpty) {
-          final address = data['results'][0]['formatted_address'];
-          return {
-            'address': address,
-            'temperature': await _getTemperature(location),
-            'condition': await _getWeatherCondition(location),
+        if (data['cod'] == 200) {
+          final weatherData = {
+            'temperature': data['main']['temp'],
+            'feels_like': data['main']['feels_like'],
+            'humidity': data['main']['humidity'],
+            'condition': data['weather'][0]['main'],
+            'description': data['weather'][0]['description'],
+            'wind_speed': data['wind']['speed'],
+            'city': data['name'],
+            'icon': data['weather'][0]['icon'],
+            'timestamp': DateTime.now().toIso8601String(),
           };
+          
+          // Cache the weather data
+          _weatherCache[cacheKey] = weatherData;
+          _lastWeatherUpdate = DateTime.now();
+          
+          return weatherData;
+        } else {
+          throw Exception('Weather API Error: ${data['message']}');
         }
+      } else {
+        final errorData = json.decode(response.body);
+        throw Exception('Failed to load weather info: ${errorData['message'] ?? response.statusCode}');
       }
-      throw Exception('Failed to load weather info: ${response.statusCode}');
     } catch (e) {
+      print('Error in getWeatherInfo: $e');
       throw Exception('Error fetching weather info: $e');
     }
-  }
-
-  Future<double> _getTemperature(LatLng location) async {
-    // This is a simplified version. In a real app, you would use a weather API
-    // For now, we'll return a random temperature for demonstration
-    return 20.0 + (DateTime.now().millisecondsSinceEpoch % 20);
-  }
-
-  Future<String> _getWeatherCondition(LatLng location) async {
-    // This is a simplified version. In a real app, you would use a weather API
-    // For now, we'll return a random condition for demonstration
-    final conditions = ['Sunny', 'Cloudy', 'Rainy'];
-    return conditions[DateTime.now().millisecondsSinceEpoch % 3];
   }
 
   Future<Map<String, dynamic>> searchNearbyPlaces(String placeType, LatLng location) async {
@@ -239,5 +273,148 @@ class MapsService {
     } catch (e) {
       throw Exception('Error fetching nearby places: $e');
     }
+  }
+
+  Future<Map<String, dynamic>> getRouteWithWeather(
+    String origin,
+    String destination,
+    TransportationMode mode,
+  ) async {
+    // Get the route
+    final route = await _getSingleRoute(origin, destination, mode); // Use _getSingleRoute to get all alternatives
+    
+    // Analyze route safety and suggest alternatives based on traffic
+    final processedRoute = await _checkRouteSafetyAndSuggestAlternative(route, origin, destination, mode);
+
+    // Get weather for origin and destination
+    try {
+      final originLatLng = await _getLatLngFromAddress(origin);
+      final destLatLng = await _getLatLngFromAddress(destination);
+      
+      final originWeather = await getWeatherInfo(originLatLng);
+      final destWeather = await getWeatherInfo(destLatLng);
+      
+      // Add weather information to the route data
+      processedRoute['origin_weather'] = originWeather;
+      processedRoute['destination_weather'] = destWeather;
+      
+      // Calculate and add overall traffic impact for the primary route
+      if (processedRoute['routes'] != null && processedRoute['routes'].isNotEmpty) {
+        final primaryRoute = processedRoute['routes'][0];
+        final int duration = primaryRoute['legs'][0]['duration']['value'];
+        final int durationInTraffic = primaryRoute['legs'][0]['duration_in_traffic']['value'] ?? duration; // Fallback to duration if no traffic data
+
+        final double trafficImpactPercentage = ((durationInTraffic - duration) / duration) * 100;
+
+        if (trafficImpactPercentage > 10) { // More than 10% longer due to traffic
+          processedRoute['traffic_impact'] = 'Heavy Traffic (${trafficImpactPercentage.toStringAsFixed(0)}% delay)';
+        } else if (trafficImpactPercentage > 0) {
+          processedRoute['traffic_impact'] = 'Moderate Traffic (${trafficImpactPercentage.toStringAsFixed(0)}% delay)';
+        } else {
+          processedRoute['traffic_impact'] = 'Light Traffic / No Delay';
+        }
+      }
+
+      return processedRoute;
+    } catch (e) {
+      print('Error getting weather/traffic for route: $e');
+      return processedRoute; // Return route without weather/traffic if fetch fails
+    }
+  }
+
+  Future<Map<String, dynamic>> _checkRouteSafetyAndSuggestAlternative(
+    Map<String, dynamic> routeData,
+    String origin,
+    String destination,
+    TransportationMode mode,
+  ) async {
+    if (routeData['routes'] == null || routeData['routes'].isEmpty) {
+      return routeData; // No routes found, return as is
+    }
+
+    final List<dynamic> routes = List.from(routeData['routes']); // Create a modifiable list
+
+    // Sort routes by duration in traffic (shortest first)
+    routes.sort((a, b) {
+      final int durationA = a['legs'][0]['duration_in_traffic']['value'] ?? a['legs'][0]['duration']['value'];
+      final int durationB = b['legs'][0]['duration_in_traffic']['value'] ?? b['legs'][0]['duration']['value'];
+      return durationA.compareTo(durationB);
+    });
+
+    final primaryRoute = routes[0];
+    final int primaryRouteTrafficDuration = primaryRoute['legs'][0]['duration_in_traffic']['value'] ?? primaryRoute['legs'][0]['duration']['value'];
+
+    // Check if there's a significantly faster alternative (e.g., 20% faster)
+    if (routes.length > 1) {
+      final alternativeRoute = routes[1];
+      final int alternativeRouteTrafficDuration = alternativeRoute['legs'][0]['duration_in_traffic']['value'] ?? alternativeRoute['legs'][0]['duration']['value'];
+
+      if ((primaryRouteTrafficDuration - alternativeRouteTrafficDuration) / primaryRouteTrafficDuration > 0.20) {
+        // If the primary route is more than 20% slower due to traffic, suggest the alternative
+        print('Traffic Warning: Primary route is significantly slower. Suggesting alternative.');
+        
+        // Add a flag and the alternative route info to the returned data.
+        routeData['is_safe_route'] = false;
+        routeData['suggested_alternative_route'] = alternativeRoute;
+        // Update the 'routes' in routeData to prioritize the suggested alternative if unsafe
+        routeData['routes'] = routes; // Keep all routes sorted for potential UI display
+        return routeData;
+      }
+    }
+
+    routeData['is_safe_route'] = true;
+    routeData['routes'] = routes; // Ensure routes are sorted for primary display
+    return routeData;
+  }
+
+  Future<LatLng> _getLatLngFromAddress(String address) async {
+    final String url = 'https://maps.googleapis.com/maps/api/geocode/json?'
+        'address=${Uri.encodeComponent(address)}'
+        '&key=$_googleApiKey';
+
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['results'] != null && data['results'].isNotEmpty) {
+          final location = data['results'][0]['geometry']['location'];
+          return LatLng(location['lat'], location['lng']);
+        }
+      }
+      throw Exception('Failed to geocode address');
+    } catch (e) {
+      throw Exception('Error geocoding address: $e');
+    }
+  }
+
+  Future<Map<String, dynamic>> getWeatherForClickedLocation(LatLng location) async {
+    try {
+      final weatherData = await getWeatherInfo(location);
+      return {
+        'location': location,
+        'weather': weatherData,
+      };
+    } catch (e) {
+      throw Exception('Error getting weather for clicked location: $e');
+    }
+  }
+
+  // Helper method to get weather icon URL
+  String getWeatherIconUrl(String iconCode) {
+    return 'https://openweathermap.org/img/wn/$iconCode@2x.png';
+  }
+
+  // Helper method to format weather data for display
+  Map<String, String> formatWeatherForDisplay(Map<String, dynamic> weatherData) {
+    return {
+      'temperature': '${weatherData['temperature'].toStringAsFixed(1)}°C',
+      'feels_like': '${weatherData['feels_like'].toStringAsFixed(1)}°C',
+      'humidity': '${weatherData['humidity']}%',
+      'condition': weatherData['condition'],
+      'description': weatherData['description'],
+      'wind_speed': '${weatherData['wind_speed']} m/s',
+      'city': weatherData['city'],
+      'icon_url': getWeatherIconUrl(weatherData['icon']),
+    };
   }
 } 
