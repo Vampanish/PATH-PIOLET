@@ -12,6 +12,8 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
+import 'theme_provider.dart';
+import 'pages/language_selection_page.dart';
 
 // Global variable to persist route data across hot reloads
 class RouteState {
@@ -36,14 +38,25 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Maps App',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
+    final themeProvider = ThemeProvider();
+    return ThemeProviderWidget(
+      themeProvider: themeProvider,
+      child: MaterialApp(
+        title: 'Maps App',
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+          useMaterial3: true,
+        ),
+        darkTheme: ThemeData.dark().copyWith(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: Colors.deepPurple,
+            brightness: Brightness.dark,
+          ),
+        ),
+        themeMode: themeProvider.value,
+        home: LanguageSelectionPage(themeProvider: themeProvider),
+        debugShowCheckedModeBanner: false,
       ),
-      home: const MapsHomePage(),
-      debugShowCheckedModeBanner: false,
     );
   }
 }
@@ -193,8 +206,8 @@ class _MapsHomePageState extends State<MapsHomePage> {
       return;
     }
 
-    final String apiKey = 'API_KEYS';
-    final String signature = 'SECRET_KEY';
+    final String apiKey = 'API';
+    final String signature = 'SECRET';
     final String url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json'
         '?input=${Uri.encodeComponent(input)}'
         '&key=$apiKey'
