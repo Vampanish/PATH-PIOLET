@@ -12,6 +12,8 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
+import 'gnn_page.dart';
+import 'turn_by_turn_page.dart';
 
 // Global variable to persist route data across hot reloads
 class RouteState {
@@ -193,8 +195,8 @@ class _MapsHomePageState extends State<MapsHomePage> {
       return;
     }
 
-    final String apiKey = 'API_KEYS';
-    final String signature = 'SECRET_KEY';
+    final String apiKey = 'API';
+    final String signature = 'SECRET';
     final String url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json'
         '?input=${Uri.encodeComponent(input)}'
         '&key=$apiKey'
@@ -704,56 +706,261 @@ class _MapsHomePageState extends State<MapsHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: Column(
+      appBar: AppBar(
+        title: const Text('PathPilot'),
+      ),
+      body: Stack(
         children: [
-          _buildSearchBar(),
-          Expanded(
-            child: Stack(
-              children: [
-                _isMapReady
-                    ? _buildMap()
-                    : const Center(child: CircularProgressIndicator()),
-                if (_showRouteSummaryCard && _routeDuration != null && _routeDistance != null)
-                  Positioned(
-                    bottom: 16,
-                    left: 16,
-                    right: 16,
-                    child: Column(
+          Column(
+            children: [
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.3),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.cyanAccent[400]!.withOpacity(0.5),
+                    width: 1,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 4,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    Row(
                       children: [
-                        RouteInfoCard(
-                          duration: _routeDuration!,
-                          distance: _routeDistance!,
-                          routeColor: _routeColor,
-                          alternativeRoutesCount: _alternativeRoutes.length,
+                        Expanded(
+                          child: CompositedTransformTarget(
+                            link: _sourceLayerLink,
+                            child: TextField(
+                              controller: _sourceController,
+                              focusNode: _sourceFocusNode,
+                              decoration: _buildTextFieldDecoration('Enter Source', _sourceController),
+                              onChanged: (value) {
+                                setState(() {});
+                                _getPlaceSuggestions(value, true);
+                              },
+                              style: TextStyle(fontSize: 13.0, color: Colors.black87),
+                            ),
+                          ),
                         ),
-                        const SizedBox(height: 8),
-                        ElevatedButton.icon(
-                          onPressed: _downloadRouteForOffline,
-                          icon: const Icon(Icons.download),
-                          label: const Text('Download for Offline'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
-                            foregroundColor: Colors.white,
+                        SizedBox(width: 8),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.cyanAccent[400]!.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Colors.cyanAccent[400]!.withOpacity(0.5),
+                              width: 1,
+                            ),
+                          ),
+                          child: IconButton(
+                            onPressed: () async {
+                              try {
+                                final location = await _locationService.getCurrentLocation();
+                                if (location != null) {
+                                  final address = await _mapsService.getAddressFromLatLng(location);
+                                  if (address != null) {
+                                    setState(() {
+                                      _sourceController.text = address;
+                                      _currentLocation = location;
+                                    });
+                                    if (mapController != null) {
+                                      mapController!.animateCamera(
+                                        CameraUpdate.newLatLngZoom(location, 15),
+                                      );
+                                    }
+                                  }
+                                }
+                              } catch (e) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Error getting current location: $e'),
+                                    backgroundColor: Colors.red,
+                                  ),
+                                );
+                              }
+                            },
+                            icon: Icon(Icons.my_location, color: Colors.cyanAccent[700], size: 20),
+                            tooltip: 'Use current location',
+                            padding: EdgeInsets.all(8),
+                            constraints: BoxConstraints(),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                _buildAppTitle(),
-                _buildInfoButtons(),
-                _buildTrafficAndWeatherInfo(),
-                _buildWeatherButton(),
-                _buildRouteSummaryToggleButton(),
-              ],
-            ),
+                    SizedBox(height: 8),
+                    CompositedTransformTarget(
+                      link: _destinationLayerLink,
+                      child: TextField(
+                        controller: _destinationController,
+                        focusNode: _destinationFocusNode,
+                        decoration: _buildTextFieldDecoration('Enter Destination', _destinationController),
+                        onChanged: (value) {
+                          setState(() {});
+                          _getPlaceSuggestions(value, false);
+                        },
+                        style: TextStyle(fontSize: 13.0, color: Colors.black87),
+                      ),
+                    ),
+                    SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: _isMapReady ? _getRoute : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.cyanAccent[400]!.withOpacity(0.3),
+                              foregroundColor: Colors.cyanAccent[700],
+                              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                              textStyle: TextStyle(fontSize: 14.0),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8.0),
+                                side: BorderSide(
+                                  color: Colors.cyanAccent[400]!.withOpacity(0.5),
+                                  width: 1.0,
+                                ),
+                              ),
+                              elevation: 0,
+                            ),
+                            child: const Text('Show Route'),
+                          ),
+                        ),
+                        SizedBox(width: 8),
+                        _buildTransportModeButton(
+                          Icons.directions_car,
+                          'Car',
+                          TransportationMode.driving,
+                        ),
+                        SizedBox(width: 4),
+                        _buildTransportModeButton(
+                          Icons.directions_bike,
+                          'Bike',
+                          TransportationMode.bicycling,
+                        ),
+                        SizedBox(width: 4),
+                        _buildTransportModeButton(
+                          Icons.directions_walk,
+                          'Walk',
+                          TransportationMode.walking,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: Stack(
+                  children: [
+                    _isMapReady
+                        ? _buildMap()
+                        : const Center(child: CircularProgressIndicator()),
+                    if (_showRouteSummaryCard && _routeDuration != null && _routeDistance != null)
+                      Positioned(
+                        bottom: 16,
+                        left: 16,
+                        right: 16,
+                        child: Column(
+                          children: [
+                            RouteInfoCard(
+                              duration: _routeDuration!,
+                              distance: _routeDistance!,
+                              routeColor: _routeColor,
+                              alternativeRoutesCount: _alternativeRoutes.length,
+                            ),
+                            const SizedBox(height: 8),
+                            ElevatedButton.icon(
+                              onPressed: _downloadRouteForOffline,
+                              icon: const Icon(Icons.download),
+                              label: const Text('Download for Offline'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.blue,
+                                foregroundColor: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    _buildInfoButtons(),
+                    _buildTrafficAndWeatherInfo(),
+                    Positioned(
+                      top: 16,
+                      right: 16,
+                      child: FloatingActionButton(
+                        onPressed: () async {
+                          if (_lastClickedLocation != null) {
+                            try {
+                              final weatherData = await _mapsService.getWeatherForClickedLocation(_lastClickedLocation!);
+                              setState(() {
+                                _clickedLocationWeather = weatherData;
+                                _showClickedLocationWeather = true;
+                              });
+                            } catch (e) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error getting weather: $e')),
+                              );
+                            }
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('Please click on a location first')),
+                            );
+                          }
+                        },
+                        child: _clickedLocationWeather != null && _clickedLocationWeather!['weather']['icon'] != null
+                            ? Image.network(
+                                'https://openweathermap.org/img/wn/${_clickedLocationWeather!['weather']['icon']}@2x.png',
+                                width: 32,
+                                height: 32,
+                              )
+                            : Icon(Icons.wb_sunny),
+                        backgroundColor: Colors.cyanAccent[400]!.withOpacity(0.8),
+                      ),
+                    ),
+                    _buildRouteSummaryToggleButton(),
+                  ],
+                ),
+              ),
+            ],
           ),
+          if (_selectedRouteIndex >= 0 && _alternativeRoutes.isNotEmpty && RouteState.sourceLocation != null)
+            Positioned(
+              bottom: 80,
+              right: 16,
+              child: FloatingActionButton(
+                onPressed: () {
+                  final route = _alternativeRoutes[_selectedRouteIndex];
+                  if (route['legs'] != null && route['legs'].isNotEmpty) {
+                    final leg = route['legs'][0];
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => TurnByTurnPage(
+                          routeSteps: List<Map<String, dynamic>>.from(leg['steps']),
+                          polylines: _polylines,
+                          markers: _markers,
+                          initialCameraPosition: RouteState.sourceLocation!,
+                        ),
+                      ),
+                    );
+                  }
+                },
+                child: const Icon(Icons.navigation),
+                backgroundColor: Colors.cyanAccent,
+              ),
+            ),
         ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.explore), label: 'Explore'),
-          BottomNavigationBarItem(icon: Icon(Icons.download), label: 'Offline'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'You'),
+          BottomNavigationBarItem(icon: Icon(Icons.offline_pin), label: 'Offline'),
+          BottomNavigationBarItem(icon: Icon(Icons.analytics), label: 'GNN'),
         ],
         onTap: (index) {
           if (index == 1) {
@@ -763,151 +970,13 @@ class _MapsHomePageState extends State<MapsHomePage> {
                 builder: (context) => const OfflineRoutesScreen(),
               ),
             );
+          } else if (index == 2) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const GNNPage()),
+            );
           }
         },
-      ),
-    );
-  }
-
-  Widget _buildSearchBar() {
-    return Container(
-      padding: EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.3),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-          color: Colors.cyanAccent[400]!.withOpacity(0.5),
-          width: 1,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.1),
-            blurRadius: 4,
-            offset: Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: CompositedTransformTarget(
-                  link: _sourceLayerLink,
-                  child: TextField(
-                    controller: _sourceController,
-                    focusNode: _sourceFocusNode,
-                    decoration: _buildTextFieldDecoration('Enter Source', _sourceController),
-                    onChanged: (value) {
-                      setState(() {});
-                      _getPlaceSuggestions(value, true);
-                    },
-                    style: TextStyle(fontSize: 14.0, color: Colors.black87),
-                  ),
-                ),
-              ),
-              SizedBox(width: 8),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.cyanAccent[400]!.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: Colors.cyanAccent[400]!.withOpacity(0.5),
-                    width: 1,
-                  ),
-                ),
-                child: IconButton(
-                  onPressed: () async {
-                    try {
-                      final location = await _locationService.getCurrentLocation();
-                      if (location != null) {
-                        final address = await _mapsService.getAddressFromLatLng(location);
-                        if (address != null) {
-                          setState(() {
-                            _sourceController.text = address;
-                            _currentLocation = location;
-                          });
-                          // Update map camera to current location
-                          if (mapController != null) {
-                            mapController!.animateCamera(
-                              CameraUpdate.newLatLngZoom(location, 15),
-                            );
-                          }
-                        }
-                      }
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('Error getting current location: $e'),
-                          backgroundColor: Colors.red,
-                        ),
-                      );
-                    }
-                  },
-                  icon: Icon(Icons.my_location, color: Colors.cyanAccent[700]),
-                  tooltip: 'Use current location',
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 10),
-          CompositedTransformTarget(
-            link: _destinationLayerLink,
-            child: TextField(
-              controller: _destinationController,
-              focusNode: _destinationFocusNode,
-              decoration: _buildTextFieldDecoration('Enter Destination', _destinationController),
-              onChanged: (value) {
-                setState(() {});
-                _getPlaceSuggestions(value, false);
-              },
-              style: TextStyle(fontSize: 14.0, color: Colors.black87),
-            ),
-          ),
-          SizedBox(height: 10),
-          ElevatedButton(
-            onPressed: _isMapReady ? _getRoute : null,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.cyanAccent[400]!.withOpacity(0.3),
-              foregroundColor: Colors.cyanAccent[700],
-              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-              textStyle: TextStyle(fontSize: 16.0),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8.0),
-                side: BorderSide(
-                  color: Colors.cyanAccent[400]!.withOpacity(0.5),
-                  width: 1.0,
-                ),
-              ),
-              minimumSize: Size(double.infinity, 40),
-              elevation: 0,
-            ),
-            child: const Text('Show Route'),
-          ),
-          SizedBox(height: 10),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _buildTransportModeButton(
-                Icons.directions_car,
-                'Car',
-                TransportationMode.driving,
-              ),
-              SizedBox(width: 8),
-              _buildTransportModeButton(
-                Icons.directions_bike,
-                'Bike',
-                TransportationMode.bicycling,
-              ),
-              SizedBox(width: 8),
-              _buildTransportModeButton(
-                Icons.directions_walk,
-                'Walk',
-                TransportationMode.walking,
-              ),
-            ],
-          ),
-        ],
       ),
     );
   }
@@ -994,35 +1063,6 @@ class _MapsHomePageState extends State<MapsHomePage> {
           _showRouteSummaryCard = false;
         });
       },
-    );
-  }
-
-  Widget _buildAppTitle() {
-    return Positioned(
-      top: 16,
-      left: 16,
-      child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black26,
-              blurRadius: 6,
-              offset: Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Text(
-          'PathPilot',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-            color: Colors.cyanAccent[700],
-          ),
-        ),
-      ),
     );
   }
 
@@ -1408,42 +1448,6 @@ class _MapsHomePageState extends State<MapsHomePage> {
           SizedBox(width: 4),
           Text(label, style: TextStyle(fontSize: 14)),
         ],
-      ),
-    );
-  }
-
-  Widget _buildWeatherButton() {
-    return Positioned(
-      bottom: 100,
-      right: 16,
-      child: FloatingActionButton(
-        onPressed: () async {
-          if (_lastClickedLocation != null) {
-            try {
-              final weatherData = await _mapsService.getWeatherForClickedLocation(_lastClickedLocation!);
-              setState(() {
-                _clickedLocationWeather = weatherData;
-                _showClickedLocationWeather = true;
-              });
-            } catch (e) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Error getting weather: $e')),
-              );
-            }
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Please click on a location first')),
-            );
-          }
-        },
-        child: _clickedLocationWeather != null && _clickedLocationWeather!['weather']['icon'] != null
-            ? Image.network(
-                'https://openweathermap.org/img/wn/${_clickedLocationWeather!['weather']['icon']}@2x.png',
-                width: 32,
-                height: 32,
-              )
-            : Icon(Icons.wb_sunny),
-        backgroundColor: Colors.cyanAccent[400]!.withOpacity(0.8),
       ),
     );
   }
