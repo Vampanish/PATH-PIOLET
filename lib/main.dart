@@ -14,6 +14,11 @@ import 'dart:convert';
 import 'dart:async';
 import 'gnn_page.dart';
 import 'turn_by_turn_page.dart';
+import 'screens/login_page.dart';
+import 'screens/language_selection_page.dart';
+import 'screens/voice_instruction_page.dart';
+import 'package:provider/provider.dart';
+import 'theme_provider.dart';
 
 // Global variable to persist route data across hot reloads
 class RouteState {
@@ -29,8 +34,25 @@ class RouteState {
   static Color? routeColor;
 }
 
+class LocaleProvider extends ChangeNotifier {
+  String _localeCode = 'en';
+  String get localeCode => _localeCode;
+  void setLocale(String code) {
+    _localeCode = code;
+    notifyListeners();
+  }
+}
+
 void main() {
-  runApp(const MyApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider(create: (_) => LocaleProvider()),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -38,14 +60,37 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final themeProvider = Provider.of<ThemeProvider>(context);
+    final localeProvider = Provider.of<LocaleProvider>(context);
+    
     return MaterialApp(
       title: 'Maps App',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
+        brightness: themeProvider.isDarkMode ? Brightness.dark : Brightness.light,
       ),
-      home: const MapsHomePage(),
+      locale: Locale(localeProvider.localeCode),
+      supportedLocales: const [
+        Locale('en'),
+        Locale('hi'),
+        Locale('ta'),
+        Locale('bn'),
+        Locale('te'),
+        Locale('mr'),
+        Locale('gu'),
+        Locale('kn'),
+        Locale('ml'),
+        Locale('pa'),
+      ],
+      home: const LoginPage(),
       debugShowCheckedModeBanner: false,
+      routes: {
+        '/language': (context) => LanguageSelectionPage(
+          themeProvider: Provider.of<ThemeProvider>(context, listen: false),
+        ),
+        '/home': (context) => const MapsHomePage(),
+      },
     );
   }
 }
@@ -120,10 +165,28 @@ class _MapsHomePageState extends State<MapsHomePage> {
   }
 
   Future<void> _initLocationAndMap() async {
-    await _locationService.getCurrentLocation();
-    setState(() {
-      _isMapReady = true;
-    });
+    print('Initializing location and map...'); // Debug log
+    try {
+      final location = await _locationService.getCurrentLocation();
+      print('Current location: $location'); // Debug log
+      
+      if (location != null) {
+        setState(() {
+          _currentLocation = location;
+          _isMapReady = true;
+        });
+      } else {
+        print('Location is null, using default location'); // Debug log
+        setState(() {
+          _isMapReady = true;
+        });
+      }
+    } catch (e) {
+      print('Error initializing location: $e'); // Debug log
+      setState(() {
+        _isMapReady = true;
+      });
+    }
   }
 
   Future<void> _loadCustomMarker() async {
@@ -195,8 +258,8 @@ class _MapsHomePageState extends State<MapsHomePage> {
       return;
     }
 
-    final String apiKey = 'API';
-    final String signature = 'SECRET';
+    final String apiKey = 'AIzaSyDSgf5lvgOjhac2VNuLnoM13NGF1vgdzx0';
+    final String signature = 'WUSkTL0RK6nmFFUhti6G2-X7SuE=';
     final String url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json'
         '?input=${Uri.encodeComponent(input)}'
         '&key=$apiKey'
@@ -1014,21 +1077,26 @@ class _MapsHomePageState extends State<MapsHomePage> {
   }
 
   Widget _buildMap() {
+    print('Building map widget...'); // Debug log
+    print('Map ready: $_isMapReady'); // Debug log
+    print('Current location: ${_locationService.currentLocation}'); // Debug log
+    
+    if (!_isMapReady) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+
     return GoogleMap(
       onMapCreated: (GoogleMapController controller) {
+        print('Map controller created'); // Debug log
         mapController = controller;
-        if (RouteState.sourceLocation != null) {
-          controller.animateCamera(
-            CameraUpdate.newLatLngZoom(RouteState.sourceLocation!, 15),
-          );
-        } else if (_locationService.currentLocation != null) {
-          controller.animateCamera(
-            CameraUpdate.newLatLng(_locationService.currentLocation!),
-          );
-        }
+        _initializeMapCamera();
       },
       initialCameraPosition: CameraPosition(
-        target: RouteState.sourceLocation ?? _locationService.currentLocation ?? const LatLng(11.6643, 78.1460),
+        target: RouteState.sourceLocation ?? 
+                _locationService.currentLocation ?? 
+                const LatLng(11.6643, 78.1460),
         zoom: 16,
       ),
       myLocationEnabled: true,
@@ -1064,6 +1132,35 @@ class _MapsHomePageState extends State<MapsHomePage> {
         });
       },
     );
+  }
+
+  Future<void> _initializeMapCamera() async {
+    try {
+      if (mapController == null) return;
+
+      if (RouteState.sourceLocation != null) {
+        print('Using source location: ${RouteState.sourceLocation}'); // Debug log
+        await mapController!.animateCamera(
+          CameraUpdate.newLatLngZoom(RouteState.sourceLocation!, 15),
+        );
+      } else if (_locationService.currentLocation != null) {
+        print('Using current location: ${_locationService.currentLocation}'); // Debug log
+        await mapController!.animateCamera(
+          CameraUpdate.newLatLng(_locationService.currentLocation!),
+        );
+      } else {
+        print('Using default location'); // Debug log
+        // Try to get current location
+        final location = await _locationService.getCurrentLocation();
+        if (location != null) {
+          await mapController!.animateCamera(
+            CameraUpdate.newLatLng(location),
+          );
+        }
+      }
+    } catch (e) {
+      print('Error initializing map camera: $e'); // Debug log
+    }
   }
 
   Widget _buildInfoButtons() {
