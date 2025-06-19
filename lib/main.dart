@@ -39,12 +39,17 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Maps App',
+      title: 'PathPilot',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         useMaterial3: true,
       ),
-      home: const MapsHomePage(),
+      initialRoute: '/map',
+      routes: {
+        '/map': (context) => const MapsHomePage(),
+        '/profile': (context) => const ProfilePage(),
+        '/reward': (context) => const RewardPage(),
+      },
       debugShowCheckedModeBanner: false,
     );
   }
@@ -706,6 +711,33 @@ class _MapsHomePageState extends State<MapsHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      drawer: Drawer(
+        child: ListView(
+          padding: EdgeInsets.zero,
+          children: [
+            const DrawerHeader(
+              decoration: BoxDecoration(
+                color: Colors.deepPurple,
+              ),
+              child: Text('Menu', style: TextStyle(color: Colors.white, fontSize: 24)),
+            ),
+            ListTile(
+              leading: const Icon(Icons.person),
+              title: const Text('Profile'),
+              onTap: () {
+                Navigator.of(context).pushNamed('/profile');
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.card_giftcard),
+              title: const Text('Reward'),
+              onTap: () {
+                Navigator.of(context).pushNamed('/reward');
+              },
+            ),
+          ],
+        ),
+      ),
       appBar: AppBar(
         title: const Text('PathPilot'),
       ),
@@ -1593,5 +1625,31 @@ class _MapsHomePageState extends State<MapsHomePage> {
     setState(() {
       _polylines = updatedPolylines;
     });
+  }
+}
+
+// Placeholder Profile Page
+class ProfilePage extends StatelessWidget {
+  const ProfilePage({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Profile')),
+      body: const Center(child: Text('Profile Page')),
+    );
+  }
+}
+
+// Placeholder Reward Page
+class RewardPage extends StatelessWidget {
+  const RewardPage({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Reward')),
+      body: const Center(child: Text('Reward Page')),
+    );
   }
 }
