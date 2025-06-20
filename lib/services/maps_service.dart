@@ -12,9 +12,9 @@ enum TransportationMode {
 }
 
 class MapsService {
-  static const String _googleApiKey = 'YOUR_NEW_API_KEY_HERE';
-  static const String _signature = 'WUSkTL0RK6nmFFUhti6G2-X7SuE=';
-  static const String _weatherApiKey = '09e20e71f270d4f9493c1f1292432a5b';
+  static const String _googleApiKey = 'API';
+  static const String _signature = 'SECRET';
+  static const String _weatherApiKey = 'WEATHER';
 
   // Cache for weather data to avoid too many API calls
   final Map<String, Map<String, dynamic>> _weatherCache = {};

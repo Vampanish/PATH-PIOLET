@@ -119,7 +119,7 @@ class _MapsHomePageState extends State<MapsHomePage> {
   int _selectedRouteIndex = 0;
   Color? _routeColor;
   BitmapDescriptor? _customMarkerIcon;
-  bool _isMapReady = false;
+  bool _isMapReady = true;
   List<Map<String, dynamic>> _sourceSuggestions = [];
   List<Map<String, dynamic>> _destinationSuggestions = [];
   bool _isSourceFocused = false;
@@ -258,8 +258,8 @@ class _MapsHomePageState extends State<MapsHomePage> {
       return;
     }
 
-    final String apiKey = 'AIzaSyDSgf5lvgOjhac2VNuLnoM13NGF1vgdzx0';
-    final String signature = 'WUSkTL0RK6nmFFUhti6G2-X7SuE=';
+    final String apiKey = 'API';
+    final String signature = 'SECRET';
     final String url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json'
         '?input=${Uri.encodeComponent(input)}'
         '&key=$apiKey'
