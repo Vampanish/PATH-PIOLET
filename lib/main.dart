@@ -258,8 +258,8 @@ class _MapsHomePageState extends State<MapsHomePage> {
       return;
     }
 
-    final String apiKey = 'API';
-    final String signature = 'SECRET';
+    final String apiKey = 'AIzaSyDSgf5lvgOjhac2VNuLnoM13NGF1vgdzx0';
+    final String signature = 'WUSkTL0RK6nmFFUhti6G2-X7SuE=';
     final String url = 'https://maps.googleapis.com/maps/api/place/autocomplete/json'
         '?input=${Uri.encodeComponent(input)}'
         '&key=$apiKey'
@@ -1034,10 +1034,21 @@ class _MapsHomePageState extends State<MapsHomePage> {
               ),
             );
           } else if (index == 2) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const GNNPage()),
-            );
+            if (_sourceController.text.isNotEmpty && _destinationController.text.isNotEmpty) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => GNNPage(
+                    origin: _sourceController.text,
+                    destination: _destinationController.text,
+                  ),
+                ),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Please enter source and destination.')),
+              );
+            }
           }
         },
       ),

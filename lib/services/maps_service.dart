@@ -12,9 +12,9 @@ enum TransportationMode {
 }
 
 class MapsService {
-  static const String _googleApiKey = 'API';
-  static const String _signature = 'SECRET';
-  static const String _weatherApiKey = 'WEATHER';
+  static const String _googleApiKey = 'AIzaSyDSgf5lvgOjhac2VNuLnoM13NGF1vgdzx0';
+  static const String _signature = 'WUSkTL0RK6nmFFUhti6G2-X7SuE=';
+  static const String _weatherApiKey = '09e20e71f270d4f9493c1f1292432a5b';
 
   // Cache for weather data to avoid too many API calls
   final Map<String, Map<String, dynamic>> _weatherCache = {};
@@ -519,5 +519,90 @@ class MapsService {
     return {
       'route_traffic': routeTraffic,
     };
+  }
+
+  Future<Map<String, dynamic>> getRouteAsGraph(String origin, String destination) async {
+    final routeData = await getRoute(origin, destination, TransportationMode.driving);
+
+    if (routeData['routes'] == null || routeData['routes'].isEmpty) {
+      return {'nodes': [], 'edges': []};
+    }
+
+    final route = routeData['routes'][0];
+    final leg = route['legs'][0];
+    final steps = leg['steps'];
+
+    List<Map<String, String>> nodes = [];
+    List<List<String>> edges = [];
+
+    // Add origin
+    String originCity = (await _getCityFromAddress(origin)) ?? 'Origin';
+    nodes.add({'id': originCity, 'label': originCity});
+
+    String previousNodeId = originCity;
+
+    for (var step in steps) {
+      String instruction = step['html_instructions'];
+      // A simple way to find place names in instructions
+      RegExp regExp = RegExp(r'<b>(.*?)</b>');
+      Iterable<RegExpMatch> matches = regExp.allMatches(instruction);
+      
+      String? stepPlaceName;
+      if (matches.isNotEmpty) {
+        stepPlaceName = matches.first.group(1);
+      }
+
+      if (stepPlaceName != null && stepPlaceName.toLowerCase() != "destination") {
+        String currentNodeId = stepPlaceName;
+        
+        bool nodeExists = nodes.any((node) => node['id'] == currentNodeId);
+        if (!nodeExists) {
+           nodes.add({'id': currentNodeId, 'label': currentNodeId});
+           if (previousNodeId != currentNodeId) {
+             edges.add([previousNodeId, currentNodeId]);
+             previousNodeId = currentNodeId;
+           }
+        } else if(previousNodeId != currentNodeId) {
+            edges.add([previousNodeId, currentNodeId]);
+            previousNodeId = currentNodeId;
+        }
+      }
+    }
+    
+    // Add destination
+    String destinationCity = (await _getCityFromAddress(destination)) ?? 'Destination';
+     if (!nodes.any((node) => node['id'] == destinationCity)) {
+        nodes.add({'id': destinationCity, 'label': destinationCity});
+     }
+    if (previousNodeId != destinationCity) {
+      edges.add([previousNodeId, destinationCity]);
+    }
+
+
+    return {'nodes': nodes, 'edges': edges};
+  }
+
+  Future<String?> _getCityFromAddress(String address) async {
+    final String url = 'https://maps.googleapis.com/maps/api/geocode/json?'
+        'address=${Uri.encodeComponent(address)}'
+        '&key=$_googleApiKey';
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        if (data['results'] != null && data['results'].isNotEmpty) {
+          final addressComponents = data['results'][0]['address_components'];
+          for (var component in addressComponents) {
+            if (component['types'].contains('locality') || component['types'].contains('administrative_area_level_2')) {
+              return component['long_name'];
+            }
+          }
+        }
+      }
+      return null;
+    } catch (e) {
+      print('Error getting city from address: $e');
+      return null;
+    }
   }
 } 
