@@ -17,6 +17,7 @@ import 'turn_by_turn_page.dart';
 import 'screens/login_page.dart';
 import 'screens/language_selection_page.dart';
 import 'screens/voice_instruction_page.dart';
+import 'pages/authority/authority_dashboard.dart';
 import 'package:provider/provider.dart';
 import 'theme_provider.dart';
 
@@ -83,13 +84,16 @@ class MyApp extends StatelessWidget {
         Locale('ml'),
         Locale('pa'),
       ],
-      home: const LoginPage(),
+      home: LoginPage(themeProvider: themeProvider),
       debugShowCheckedModeBanner: false,
       routes: {
         '/language': (context) => LanguageSelectionPage(
           themeProvider: Provider.of<ThemeProvider>(context, listen: false),
         ),
         '/home': (context) => const MapsHomePage(),
+        '/authority': (context) => AuthorityDashboard(
+          themeProvider: Provider.of<ThemeProvider>(context, listen: false),
+        ),
       },
     );
   }
