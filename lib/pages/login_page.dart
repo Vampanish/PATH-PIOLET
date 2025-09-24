@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import '../theme_provider.dart';
-import 'language_selection_page.dart';
-import 'package:flutter_tts/flutter_tts.dart';
 
 class LoginPage extends StatefulWidget {
   final ThemeProvider themeProvider;
@@ -17,7 +15,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   late Animation<Offset> _slideAnimation;
   bool _isLoading = false;
   bool _isPasswordVisible = false;
-  late FlutterTts flutterTts;
 
   @override
   void initState() {
@@ -35,8 +32,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
     _controller.forward();
-
-    flutterTts = FlutterTts();
   }
 
   @override
@@ -49,12 +44,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     setState(() => _isLoading = true);
     Future.delayed(const Duration(seconds: 2), () {
       setState(() => _isLoading = false);
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => LanguageSelectionPage(themeProvider: widget.themeProvider),
-        ),
-      );
+      Navigator.pushReplacementNamed(context, '/authority');
     });
   }
 
@@ -309,6 +299,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       ),
     );
   }
+
+
 }
 
 // Custom painter for traffic grid pattern

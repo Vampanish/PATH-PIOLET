@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'pages/login_page.dart';
-import 'pages/traffic_condition_page.dart';
+import 'pages/authority/authority_dashboard.dart';
 import 'theme_provider.dart';
 
 void main() {
@@ -21,7 +21,7 @@ class MyApp extends StatelessWidget {
     final themeProvider = Provider.of<ThemeProvider>(context);
     
     return MaterialApp(
-      title: 'Traffic Condition App',
+      title: 'PathPilot - Traffic Authority',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.light().copyWith(
         primaryColor: Colors.blue[900],
@@ -43,10 +43,7 @@ class MyApp extends StatelessWidget {
       initialRoute: '/',
       routes: {
         '/': (context) => LoginPage(themeProvider: themeProvider),
-        '/traffic': (context) => TrafficConditionPage(
-          themeProvider: themeProvider,
-          initialLanguage: 'en', // Default language
-        ),
+        '/authority': (context) => AuthorityDashboard(themeProvider: themeProvider),
       },
     );
   }

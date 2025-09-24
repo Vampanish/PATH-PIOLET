@@ -1,3 +1,4 @@
 {
-    "liveServer.settings.port": 5501
+    "liveServer.settings.port": 5501,
+    "cmake.sourceDirectory": "C:/Users/USER/Downloads/PathPilot_SIH 2/PathPilot_SIH 2/PATH-PIOLET/linux"
 }
