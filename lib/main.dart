@@ -18,6 +18,7 @@ import 'screens/login_page.dart';
 import 'screens/language_selection_page.dart';
 import 'screens/voice_instruction_page.dart';
 import 'pages/authority/authority_dashboard.dart';
+import 'pages/emergency_alert_page.dart';
 import 'package:provider/provider.dart';
 import 'theme_provider.dart';
 
@@ -67,10 +68,20 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       title: 'Maps App',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.deepPurple,
+          brightness: Brightness.light,
+        ),
         useMaterial3: true,
-        brightness: themeProvider.isDarkMode ? Brightness.dark : Brightness.light,
       ),
+      darkTheme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: Colors.deepPurple,
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+      ),
+      themeMode: themeProvider.value,
       locale: Locale(localeProvider.localeCode),
       supportedLocales: const [
         Locale('en'),
@@ -92,6 +103,9 @@ class MyApp extends StatelessWidget {
         ),
         '/home': (context) => const MapsHomePage(),
         '/authority': (context) => AuthorityDashboard(
+          themeProvider: Provider.of<ThemeProvider>(context, listen: false),
+        ),
+        '/emergency': (context) => EmergencyAlertPage(
           themeProvider: Provider.of<ThemeProvider>(context, listen: false),
         ),
       },

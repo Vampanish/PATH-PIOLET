@@ -10,55 +10,58 @@ class AuthorityHomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final service = AuthorityDataService.instance;
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // AI Status Banner
-          _AIStatusBanner(),
-          const SizedBox(height: 16),
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // AI Status Banner
+              _AIStatusBanner(),
+            const SizedBox(height: 16),
+            
+            // Emergency Vehicle Detection Banner
+            _EmergencyDetectionBanner(),
+            const SizedBox(height: 16),
           
-          // Emergency Vehicle Detection Banner
-          _EmergencyDetectionBanner(),
-          const SizedBox(height: 16),
-          
-          // Enhanced Stats with AI metrics
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: [
-              _StatCard(title: 'Vehicles On Road', stream: service.vehiclesOnRoadStream, color: Colors.blue),
-              _StatCard(title: 'Avg Commute Time (min)', stream: service.avgCommuteTimeStream, color: Colors.orange),
-              _StatCard(title: 'Avg Signal Wait (s)', stream: service.avgSignalWaitStream, color: Colors.purple),
-              _AIStatCard(title: 'AI Alerts Today', color: Colors.red),
-              _SensorStatusCard(),
-            ],
-          ),
-          const SizedBox(height: 24),
-          
-          // AI-Generated Traffic Heatmap
-          Expanded(
-            child: Row(
+            // Enhanced Stats with AI metrics
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
               children: [
-                Expanded(
-                  flex: 2,
-                  child: _AITrafficHeatmap(),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    children: [
-                      Expanded(child: _RecentAIAlerts()),
-                      const SizedBox(height: 12),
-                      Expanded(child: _AIInsights()),
-                    ],
-                  ),
-                ),
+                _StatCard(title: 'Vehicles On Road', stream: service.vehiclesOnRoadStream, color: Colors.blue),
+                _StatCard(title: 'Commute Time (min)', stream: service.avgCommuteTimeStream, color: Colors.orange),
+                _StatCard(title: 'Signal Wait (s)', stream: service.avgSignalWaitStream, color: Colors.purple),
+                _AIStatCard(title: 'AI Alerts Today', color: Colors.red),
+                _SensorStatusCard(),
               ],
             ),
-          ),
-        ],
+            const SizedBox(height: 24),
+            
+            // AI-Generated Traffic Heatmap
+            SizedBox(
+              height: 400,
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 2,
+                    child: _AITrafficHeatmap(),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Expanded(child: _RecentAIAlerts()),
+                        const SizedBox(height: 12),
+                        Expanded(child: _AIInsights()),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -67,9 +70,9 @@ class AuthorityHomePage extends StatelessWidget {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-        const SizedBox(width: 4),
-        Text(label, style: const TextStyle(fontSize: 11)),
+        Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+        const SizedBox(width: 2),
+        Text(label, style: const TextStyle(fontSize: 9)),
       ],
     );
   }
@@ -133,18 +136,22 @@ class _AIStatusBanner extends StatelessWidget {
         children: [
           const Icon(Icons.psychology, color: Colors.green, size: 24),
           const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'AI Traffic Monitoring System',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-              ),
-              const Text('🟢 Active - 8 Cameras • 40 IoT Sensors • Real-time Analysis', 
-                   style: TextStyle(fontSize: 12, color: Colors.green)),
-            ],
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'AI Traffic Monitoring System',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const Text('🟢 Active - 8 Cameras • 40 IoT Sensors • Real-time Analysis', 
+                     style: TextStyle(fontSize: 12, color: Colors.green),
+                     overflow: TextOverflow.ellipsis),
+              ],
+            ),
           ),
-          const Spacer(),
+          const SizedBox(width: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
@@ -312,7 +319,11 @@ class _AITrafficHeatmap extends StatelessWidget {
             children: [
               const Icon(Icons.map, size: 20),
               const SizedBox(width: 8),
-              Text('AI Traffic Heatmap', style: Theme.of(context).textTheme.titleMedium),
+              Expanded(
+                child: Text('AI Traffic Heatmap', 
+                  style: Theme.of(context).textTheme.titleMedium,
+                  overflow: TextOverflow.ellipsis),
+              ),
               const SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
@@ -323,11 +334,18 @@ class _AITrafficHeatmap extends StatelessWidget {
                 child: const Text('LIVE', style: TextStyle(fontSize: 8, fontWeight: FontWeight.bold)),
               ),
               const Spacer(),
-              _legendDot(Colors.green, 'Smooth'),
-              const SizedBox(width: 8),
-              _legendDot(Colors.yellow.shade700, 'Moderate'),
-              const SizedBox(width: 8),
-              _legendDot(Colors.red, 'Heavy'),
+              Expanded(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    _legendDot(Colors.green, 'Smooth'),
+                    const SizedBox(width: 4),
+                    _legendDot(Colors.yellow.shade700, 'Moderate'),
+                    const SizedBox(width: 4),
+                    _legendDot(Colors.red, 'Heavy'),
+                  ],
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -661,12 +679,15 @@ class _EmergencyDetectionBanner extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      const Text(
-                        'Emergency Vehicle Detection',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.red,
+                      const Expanded(
+                        child: Text(
+                          'Emergency Vehicle Detection',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.red,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -694,14 +715,20 @@ class _EmergencyDetectionBanner extends StatelessWidget {
                       fontSize: 12,
                       color: Colors.grey,
                     ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
                   ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
                       const Icon(Icons.sensors, size: 14, color: Colors.orange),
                       const SizedBox(width: 4),
-                      const Text('23 Active Sensors', style: TextStyle(fontSize: 11)),
-                      const SizedBox(width: 16),
+                      const Expanded(
+                        child: Text('23 Active Sensors', 
+                          style: TextStyle(fontSize: 11),
+                          overflow: TextOverflow.ellipsis),
+                      ),
+                      const SizedBox(width: 8),
                       const Icon(Icons.speed, size: 14, color: Colors.green),
                       const SizedBox(width: 4),
                       const Text('< 2s Response', style: TextStyle(fontSize: 11)),
