@@ -1,6 +1,6 @@
 {
-    "name": "networks",
-    "short_name": "networks",
+    "name": "maps",
+    "short_name": "maps",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
