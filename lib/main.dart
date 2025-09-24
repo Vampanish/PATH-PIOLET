@@ -5,7 +5,6 @@ import 'services/maps_service.dart';
 import 'services/location_service.dart';
 import 'services/offline_route_service.dart';
 import 'widgets/route_info_card.dart';
-import 'models/route_model.dart';
 import 'screens/offline_routes_screen.dart';
 import 'dart:ui' as ui;
 import 'package:flutter/services.dart';
@@ -16,10 +15,10 @@ import 'gnn_page.dart';
 import 'turn_by_turn_page.dart';
 import 'screens/login_page.dart';
 import 'screens/language_selection_page.dart';
-import 'screens/voice_instruction_page.dart';
 import 'pages/authority/authority_dashboard.dart';
 import 'pages/emergency_alert_page.dart';
 import 'package:provider/provider.dart';
+import 'pages/traffic_condition_page.dart';
 import 'theme_provider.dart';
 
 // Global variable to persist route data across hot reloads
@@ -66,18 +65,22 @@ class MyApp extends StatelessWidget {
     final localeProvider = Provider.of<LocaleProvider>(context);
     
     return MaterialApp(
-      title: 'Maps App',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.deepPurple,
-          brightness: Brightness.light,
+      title: 'PathPilot - Smart Navigation',
+      theme: ThemeData.light().copyWith(
+        primaryColor: Colors.blue[900],
+        scaffoldBackgroundColor: Colors.white,
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.blue[900],
+          elevation: 0,
         ),
         useMaterial3: true,
       ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.deepPurple,
-          brightness: Brightness.dark,
+      darkTheme: ThemeData.dark().copyWith(
+        primaryColor: Colors.grey[900],
+        scaffoldBackgroundColor: Colors.grey[900],
+        appBarTheme: AppBarTheme(
+          backgroundColor: Colors.grey[900],
+          elevation: 0,
         ),
         useMaterial3: true,
       ),
@@ -95,9 +98,14 @@ class MyApp extends StatelessWidget {
         Locale('ml'),
         Locale('pa'),
       ],
-      home: LoginPage(themeProvider: themeProvider),
       debugShowCheckedModeBanner: false,
+      initialRoute: '/',
       routes: {
+        '/': (context) => LoginPage(themeProvider: themeProvider),
+        '/traffic': (context) => TrafficConditionPage(
+          themeProvider: themeProvider,
+          initialLanguage: 'en',
+        ),
         '/language': (context) => LanguageSelectionPage(
           themeProvider: Provider.of<ThemeProvider>(context, listen: false),
         ),

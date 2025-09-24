@@ -356,41 +356,56 @@ class _AITrafficHeatmap extends StatelessWidget {
                 return Container(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(12),
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.green.withOpacity(0.8),
-                        Colors.yellow.withOpacity(0.8),
-                        Colors.red.withOpacity(0.8)
-                      ],
-                      begin: Alignment.bottomLeft,
-                      end: Alignment.topRight,
-                    ),
                   ),
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Stack(
                       children: [
-                        const Icon(Icons.psychology, size: 48, color: Colors.white),
-                        const SizedBox(height: 8),
-                        Text(
-                          'AI-Powered Heatmap',
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
+                        // Dynamic image from assets
+                        Image.asset(
+                          'assets/image.png',
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          height: double.infinity,
+                        ),
+                        // Overlay with traffic information
+                        Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.black.withOpacity(0.3),
+                                Colors.transparent,
+                                Colors.black.withOpacity(0.5)
+                              ],
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                            ),
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        if (snapshot.hasData)
-                          Text(
-                            'Overall Congestion: ${(snapshot.data!.overallCongestionLevel * 100).toInt()}%',
-                            style: const TextStyle(color: Colors.white70),
+                        // Text overlay
+                        Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              
+                              const SizedBox(height: 8),
+                              if (snapshot.hasData)
+                                Text(
+                                  'Overall Congestion: ${(snapshot.data!.overallCongestionLevel * 100).toInt()}%',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    shadows: [
+                                      Shadow(
+                                        offset: Offset(1, 1),
+                                        blurRadius: 3.0,
+                                        color: Colors.black54,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                            ],
                           ),
-                        const SizedBox(height: 8),
-                        const Text(
-                          '8 Camera Feeds • Computer Vision Analysis\nReal-time Traffic Pattern Recognition',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.white70, fontSize: 12),
                         ),
                       ],
                     ),

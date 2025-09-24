@@ -60,8 +60,7 @@ class _TurnByTurnPageState extends State<TurnByTurnPage> {
     const AndroidInitializationSettings initializationSettingsAndroid =
         AndroidInitializationSettings('@mipmap/ic_launcher');
     final DarwinInitializationSettings initializationSettingsDarwin =
-        DarwinInitializationSettings(
-            onDidReceiveLocalNotification: (id, title, body, payload) async {});
+        DarwinInitializationSettings();
     final InitializationSettings initializationSettings = InitializationSettings(
         android: initializationSettingsAndroid,
         iOS: initializationSettingsDarwin);

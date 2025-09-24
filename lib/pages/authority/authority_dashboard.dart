@@ -4,6 +4,7 @@ import 'pages/home_page.dart';
 import 'pages/signal_monitoring_page.dart';
 import 'pages/analytics_page.dart';
 import 'pages/alerts_page.dart';
+import 'pages/simulation_page.dart';
 import 'pages/settings_page.dart';
 
 class AuthorityDashboard extends StatefulWidget {
@@ -22,14 +23,16 @@ class _AuthorityDashboardState extends State<AuthorityDashboard> {
     SignalMonitoringPage(),
     AnalyticsPage(),
     AlertsPage(),
+    SimulationPage(),
     AuthoritySettingsPage(),
   ];
-
+  
   final _titles = const [
     'Dashboard',
     'Signals',
     'Analytics',
     'Alerts',
+    'Emergency',
     'Settings',
   ];
 
@@ -39,22 +42,6 @@ class _AuthorityDashboardState extends State<AuthorityDashboard> {
       appBar: AppBar(
         title: Text(_titles[_index]),
         actions: [
-          // Emergency Vehicle Detection Button
-          Container(
-            margin: const EdgeInsets.only(right: 8),
-            decoration: BoxDecoration(
-              color: Colors.red.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.red.withOpacity(0.3)),
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.emergency, color: Colors.red),
-              onPressed: () {
-                Navigator.pushNamed(context, '/emergency');
-              },
-              tooltip: 'Emergency Vehicle Detection',
-            ),
-          ),
           IconButton(
             icon: Icon(widget.themeProvider.isDarkMode ? Icons.light_mode : Icons.dark_mode),
             onPressed: widget.themeProvider.toggleTheme,
@@ -69,6 +56,7 @@ class _AuthorityDashboardState extends State<AuthorityDashboard> {
           NavigationDestination(icon: Icon(Icons.traffic_outlined), selectedIcon: Icon(Icons.traffic), label: 'Signals'),
           NavigationDestination(icon: Icon(Icons.insights_outlined), selectedIcon: Icon(Icons.insights), label: 'Analytics'),
           NavigationDestination(icon: Icon(Icons.warning_amber_outlined), selectedIcon: Icon(Icons.warning_amber), label: 'Alerts'),
+          NavigationDestination(icon: Icon(Icons.computer_outlined), selectedIcon: Icon(Icons.computer), label: 'Emergency'),
           NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'Settings'),
         ],
         onDestinationSelected: (i) => setState(() => _index = i),

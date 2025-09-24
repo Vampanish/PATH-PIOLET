@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_tts/flutter_tts.dart';
 import '../theme_provider.dart';
+import '../screens/language_selection_page.dart';
 
 class LoginPage extends StatefulWidget {
   final ThemeProvider themeProvider;
@@ -15,6 +17,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   late Animation<Offset> _slideAnimation;
   bool _isLoading = false;
   bool _isPasswordVisible = false;
+  late FlutterTts flutterTts;
+  String _selectedRole = 'driver'; // 'driver' or 'authority'
 
   @override
   void initState() {
@@ -44,7 +48,16 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     setState(() => _isLoading = true);
     Future.delayed(const Duration(seconds: 2), () {
       setState(() => _isLoading = false);
-      Navigator.pushReplacementNamed(context, '/authority');
+      if (_selectedRole == 'authority') {
+        Navigator.pushReplacementNamed(context, '/authority');
+      } else {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => LanguageSelectionPage(themeProvider: widget.themeProvider),
+          ),
+        );
+      }
     });
   }
 
@@ -205,6 +218,23 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                       ),
                     ),
                     const SizedBox(height: 30),
+                    // Role selection segmented control
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.08),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white.withOpacity(0.2)),
+                      ),
+                      child: Row(
+                        children: [
+                          _buildRoleChip(label: 'Driver', value: 'driver', icon: Icons.directions_car),
+                          const SizedBox(width: 12),
+                          _buildRoleChip(label: 'Traffic Authority', value: 'authority', icon: Icons.traffic),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
 
                     // Login Button with traffic light colors
                     SlideTransition(
@@ -300,7 +330,51 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     );
   }
 
-
+  Widget _buildRoleChip({required String label, required String value, required IconData icon}) {
+    final bool selected = _selectedRole == value;
+    return Expanded(
+      child: InkWell(
+        onTap: () => setState(() => _selectedRole = value),
+        borderRadius: BorderRadius.circular(16),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 250),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+          decoration: BoxDecoration(
+            color: selected ? Colors.green.withOpacity(0.85) : Colors.white.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withOpacity(0.25)),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: Colors.green.withOpacity(0.4),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    )
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 18, color: Colors.white.withOpacity(0.9)),
+              const SizedBox(width: 6),
+              Flexible(
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // Custom painter for traffic grid pattern
